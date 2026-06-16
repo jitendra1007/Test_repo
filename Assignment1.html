@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Expense Tracker & Budget Dashboard</title>
+    <meta name="description" content="A premium serverless Expense Tracker and Budget Dashboard. Syncs in real-time with Google Drive, offering interactive expense charts, budget limits, and metrics tracking.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#6366f1">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --primary: #818cf8;
+            --primary-hover: #6366f1;
+            --background: #090d16;
+            --surface: #131a2c;
+            --glass-bg: rgba(19, 26, 44, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #34d399;
+            --danger: #f87171;
+            --warning: #fbbf24;
+            --radius: 16px;
+            --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: radial-gradient(circle at top, #1e1b4b 0%, #090d16 100%);
+            background-attachment: fixed;
+            color: var(--text-main); 
+            line-height: 1.5; 
+            padding: 2rem 1rem; 
+            min-height: 100vh;
+        }
+
+        .container { 
+            max-width: 1100px; 
+            margin: 0 auto; 
+            background: var(--glass-bg); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 2.5rem; 
+            border-radius: var(--radius); 
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow); 
+        }
+        
+        header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 2.5rem; 
+            flex-wrap: wrap; 
+            gap: 1.5rem; 
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 1.5rem;
+        }
+
+        h1 { 
+            font-family: 'Outfit', 'Inter', sans-serif;
+            font-size: 2.25rem; 
+            font-weight: 700; 
+            background: linear-gradient(135deg, #a5b4fc 0%, #818cf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .header-badges { 
+            display: flex; 
+            gap: 1rem; 
+            align-items: center; 
+        }
+        
+        .sync-status { 
+            font-size: 0.85rem; 
+            font-weight: 600; 
+            padding: 0.5rem 1rem; 
+            border-radius: 9999px; 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 0.5rem; 
+            background-color: rgba(255, 255, 255, 0.05); 
+            color: var(--text-muted); 
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+        .sync-status.active { 
+            background-color: rgba(52, 211, 153, 0.1); 
+            color: var(--success); 
+            border-color: rgba(52, 211, 153, 0.2);
+        }
+        .sync-status.error { 
+            background-color: rgba(248, 113, 113, 0.1); 
+            color: var(--danger); 
+            border-color: rgba(248, 113, 113, 0.2);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .metric-card {
+            background: rgba(30, 41, 59, 0.3);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .metric-value {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .text-success { color: var(--success) !important; }
+        .text-danger { color: var(--danger) !important; }
+        .text-orange { color: #f97316 !important; }
+
+        .glow-green { text-shadow: 0 0 15px rgba(52, 211, 153, 0.3); }
+        .glow-red { text-shadow: 0 0 15px rgba(248, 113, 113, 0.3); }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1.1fr 0.9fr;
+            }
+        }
+
+        .card {
+            background: rgba(15, 23, 42, 0.3);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 1.75rem;
+            margin-bottom: 2rem;
+        }
+
+        .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.75rem;
+        }
+
+        .form-group-inline {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .form-group-inline input, .form-group-inline select, .form-group-inline button {
+            flex: 1;
+            min-width: 140px;
+        }
+
+        input, select {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.25);
+            background: rgba(15, 23, 42, 0.8);
+        }
+
+        select option {
+            background: var(--surface);
+            color: var(--text-main);
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid var(--glass-border);
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.825rem;
+            border-radius: 6px;
+        }
+
+        .btn-icon {
+            padding: 0.35rem;
+            background: transparent;
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border: 1px solid transparent;
+        }
+        .btn-icon:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--glass-border);
+            color: var(--text-main);
+        }
+
+        .btn-danger-text {
+            color: var(--danger);
+        }
+        .btn-danger-text:hover {
+            background: rgba(248, 113, 113, 0.1);
+            border-color: rgba(248, 113, 113, 0.2);
+        }
+
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 600;
+            padding: 0.85rem 1rem;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+        }
+
+        td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: var(--text-main);
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        .row-over-budget {
+            background: rgba(248, 113, 113, 0.04);
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .category-badge {
+            background: rgba(129, 140, 248, 0.15);
+            color: #a5b4fc;
+            padding: 0.25rem 0.6rem;
+            border-radius: 9999px;
+            font-size: 0.775rem;
+            font-weight: 600;
+            border: 1px solid rgba(129, 140, 248, 0.2);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+            border-top: 1px solid var(--glass-border);
+            padding-top: 1.5rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div id="appScreen">
+            <header>
+                <div>
+                    <h1>Expense Tracker Dashboard</h1>
+                    <div id="syncStatusIndicator" class="sync-status" style="display: none;"></div>
+                </div>
+                <div class="header-badges">
+                    <button id="authBtn" class="btn-primary btn-sm" onclick="handleAuthClick()">Connect Drive</button>
+                </div>
+            </header>
+
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <span class="metric-label">Total Budget</span>
+                    <span id="metricTotalBudget" class="metric-value">$0.00</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Total Expenses</span>
+                    <span id="metricTotalExpense" class="metric-value">$0.00</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Remaining Balance</span>
+                    <span id="metricNetBalance" class="metric-value">$0.00</span>
+                </div>
+            </div>
+
+            <div class="main-grid">
+                <div>
+                    <div class="card">
+                        <h2 class="card-title">Manage Categories</h2>
+                        <form onsubmit="addCategory(event)">
+                            <div class="form-group-inline">
+                                <input type="text" id="newCatName" placeholder="Category Name (e.g. Food)" required>
+                                <input type="number" id="newCatBudget" placeholder="Budget Amount ($)" step="0.01" min="0" required>
+                                <button type="submit" class="btn-primary">Add Category</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h2 class="card-title">Budget Summary</h2>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Budget</th>
+                                        <th>Actual</th>
+                                        <th>Remaining</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="categorySummaryTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="card">
+                        <h2 class="card-title">Expense Breakdown</h2>
+                        <div class="chart-container">
+                            <canvas id="expenseChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2 class="card-title">Log Expense</h2>
+                        <form id="expenseForm" onsubmit="addExpense(event)">
+                            <div class="form-group-inline">
+                                <input type="date" id="expenseDate" required>
+                                <select id="expenseCategorySelect" required>
+                                    <option value="" disabled selected>Select Category</option>
+                                </select>
+                            </div>
+                            <div class="form-group-inline" style="margin-top: 0.75rem;">
+                                <input type="text" id="expenseDesc" placeholder="Description (e.g. Dinner)" required>
+                                <input type="number" id="expenseAmount" placeholder="Amount ($)" step="0.01" min="0.01" required>
+                                <button type="submit" id="expenseSubmitBtn" class="btn-primary">Add Expense</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 1.5rem;">
+                <h2 class="card-title">Expense Tracker Log</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Category</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseTrackerTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="controls">
+                <div class="data-actions" style="margin-left: 0;">
+                    <button class="btn-secondary" onclick="exportData()">Export JSON</button>
+                    <button class="btn-secondary" onclick="document.getElementById('importFile').click()">Import JSON</button>
+                    <input type="file" id="importFile" accept=".json" onchange="triggerImportWithConfirm(event)">
+                    <button class="btn-secondary btn-danger-text" onclick="clearAllData()">Clear All Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let databaseArray = [];
+        let expenseChartInstance = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            const dateInput = document.getElementById('expenseDate');
+            if (dateInput) dateInput.value = today;
+
+            const storedData = localStorage.getItem('generic_app_data');
+            if (storedData) {
+                try { databaseArray = JSON.parse(storedData); } catch (e) { databaseArray = []; }
+            }
+            
+            initializeDefaultDataIfEmpty();
+            render();
+        });
+
+        function initializeDefaultDataIfEmpty() {
+            const activeCategories = databaseArray.filter(item => item.table === 'categories' && !item.deleted);
+            if (activeCategories.length === 0) {
+                const today = new Date().toISOString().split('T')[0];
+                const initialRecords = [];
+                
+                const defaultCategories = [
+                    { name: 'Housing', budget: 1500 },
+                    { name: 'Food & Dining', budget: 600 },
+                    { name: 'Transport', budget: 400 },
+                    { name: 'Entertainment', budget: 300 }
+                ];
+
+                const defaultExpenses = [
+                    { date: today, category: 'Housing', desc: 'Monthly Rent', amount: 1200 },
+                    { date: today, category: 'Food & Dining', desc: 'Grocery Store', amount: 120.50 },
+                    { date: today, category: 'Transport', desc: 'Gas Station', amount: 50 },
+                    { date: today, category: 'Entertainment', desc: 'Movie Night', amount: 30 }
+                ];
+                
+                defaultCategories.forEach((cat, index) => {
+                    initialRecords.push({
+                        id: "rec_cat_default_" + index + "_" + Date.now().toString(36),
+                        table: "categories",
+                        updatedAt: Date.now() + index,
+                        deleted: false,
+                        data: {
+                            categoryName: cat.name,
+                            budgetAmount: cat.budget
+                        }
+                    });
+                });
+
+                defaultExpenses.forEach((exp, index) => {
+                    initialRecords.push({
+                        id: "rec_exp_default_" + index + "_" + Date.now().toString(36),
+                        table: "expenses",
+                        updatedAt: Date.now() + index + 10,
+                        deleted: false,
+                        data: {
+                            date: exp.date,
+                            category: exp.category,
+                            description: exp.desc,
+                            amount: exp.amount
+                        }
+                    });
+                });
+
+                databaseArray = [...databaseArray, ...initialRecords];
+                localStorage.setItem('generic_app_data', JSON.stringify(databaseArray));
+            }
+        }
+
+        function updateDataState(newData, saveLocal = true) {
+            databaseArray = newData;
+            if (saveLocal) {
+                localStorage.setItem('generic_app_data', JSON.stringify(databaseArray));
+            }
+            render();
+        }
+
+        function exportData() {
+            if (!databaseArray.length) return alert("No data to export.");
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(databaseArray, null, 2));
+            const a = document.createElement('a'); 
+            a.setAttribute("href", dataStr); 
+            a.setAttribute("download", "expensetracker_export.json"); 
+            a.click();
+        }
+
+        function triggerImportWithConfirm(event) {
+            if (!confirm("Are you sure you want to import data? This will merge/overwrite your current local data.")) return;
+            const file = event ? event.target.files[0] : document.getElementById('importFile').files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (Array.isArray(parsed)) { 
+                        updateDataState(parsed, true); 
+                        autoUploadToCloud(); 
+                    } else {
+                        alert("Invalid backup file structure.");
+                    }
+                } catch (err) { alert("Invalid JSON file."); }
+            };
+            reader.readAsText(file);
+            if (event) event.target.value = '';
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, t => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[t] || t));
+        }
+
+        function addCategory(event) {
+            event.preventDefault();
+            const nameInput = document.getElementById('newCatName');
+            const budgetInput = document.getElementById('newCatBudget');
+            const name = nameInput.value.trim();
+            const budget = parseFloat(budgetInput.value);
+            if (!name || isNaN(budget)) return;
+            
+            const existing = databaseArray.find(item => 
+                item.table === 'categories' && 
+                !item.deleted && 
+                item.data.categoryName.toLowerCase() === name.toLowerCase()
+            );
+            if (existing) {
+                alert("Category already exists.");
+                return;
+            }
+
+            const newRecord = {
+                id: "rec_cat_" + Date.now().toString(36),
+                table: "categories",
+                updatedAt: Date.now(),
+                deleted: false,
+                data: {
+                    categoryName: name,
+                    budgetAmount: budget
+                }
+            };
+
+            databaseArray.push(newRecord);
+            updateDataState(databaseArray, true);
+            pullAndMergeCloudData();
+            
+            nameInput.value = '';
+            budgetInput.value = '';
+        }
+
+        function editCategory(id) {
+            const record = databaseArray.find(item => item.id === id);
+            if (!record) return;
+            const newName = prompt("Enter new category name:", record.data.categoryName);
+            if (newName === null) return;
+            const newBudgetStr = prompt("Enter new budget amount ($):", record.data.budgetAmount);
+            if (newBudgetStr === null) return;
+            const newBudget = parseFloat(newBudgetStr);
+            if (!newName.trim() || isNaN(newBudget)) {
+                alert("Invalid inputs.");
+                return;
+            }
+
+            const oldName = record.data.categoryName;
+            const updatedName = newName.trim();
+
+            databaseArray = databaseArray.map(item => {
+                if (item.id === id) {
+                    return {
+                        ...item,
+                        updatedAt: Date.now(),
+                        data: { ...item.data, categoryName: updatedName, budgetAmount: newBudget }
+                    };
+                }
+                if (item.table === 'expenses' && !item.deleted && item.data.category === oldName) {
+                    return {
+                        ...item,
+                        updatedAt: Date.now(),
+                        data: { ...item.data, category: updatedName }
+                    };
+                }
+                return item;
+            });
+            
+            updateDataState(databaseArray, true);
+            pullAndMergeCloudData();
+        }
+
+        function deleteCategory(id) {
+            const record = databaseArray.find(item => item.id === id);
+            if (!record) return;
+            if (!confirm(`Are you sure you want to delete the category "${record.data.categoryName}"? All associated expenses will also be soft-deleted.`)) return;
+
+            databaseArray = databaseArray.map(item => {
+                if (item.id === id) {
+                    return { ...item, deleted: true, updatedAt: Date.now() };
+                }
+                if (item.table === 'expenses' && !item.deleted && item.data.category === record.data.categoryName) {
+                    return { ...item, deleted: true, updatedAt: Date.now() };
+                }
+                return item;
+            });
+
+            updateDataState(databaseArray, true);
+            pullAndMergeCloudData();
+        }
+
+        function addExpense(event) {
+            event.preventDefault();
+            const dateInput = document.getElementById('expenseDate');
+            const catSelect = document.getElementById('expenseCategorySelect');
+            const descInput = document.getElementById('expenseDesc');
+            const amtInput = document.getElementById('expenseAmount');
+
+            const date = dateInput.value;
+            const category = catSelect.value;
+            const description = descInput.value.trim();
+            const amount = parseFloat(amtInput.value);
+
+            if (!date || !category || !description || isNaN(amount)) {
+                alert("Please fill out all fields.");
+                return;
+            }
+
+            const newRecord = {
+                id: "rec_exp_" + Date.now().toString(36),
+                table: "expenses",
+                updatedAt: Date.now(),
+                deleted: false,
+                data: {
+                    date,
+                    category,
+                    description,
+                    amount
+                }
+            };
+
+            databaseArray.push(newRecord);
+            updateDataState(databaseArray, true);
+            pullAndMergeCloudData();
+
+            descInput.value = '';
+            amtInput.value = '';
+        }
+
+        function editExpense(id) {
+            const record = databaseArray.find(item => item.id === id);
+            if (!record) return;
+            
+            document.getElementById('expenseDate').value = record.data.date;
+            document.getElementById('expenseCategorySelect').value = record.data.category;
+            document.getElementById('expenseDesc').value = record.data.description;
+            document.getElementById('expenseAmount').value = record.data.amount;
+
+            const btn = document.getElementById('expenseSubmitBtn');
+            btn.textContent = "Update Expense";
+            btn.onclick = (e) => {
+                e.preventDefault();
+                updateExpense(id);
+            };
+
+            let cancelBtn = document.getElementById('expenseCancelBtn');
+            if (!cancelBtn) {
+                cancelBtn = document.createElement('button');
+                cancelBtn.id = 'expenseCancelBtn';
+                cancelBtn.type = 'button';
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.className = 'btn-secondary';
+                cancelBtn.style.marginLeft = '0.5rem';
+                cancelBtn.onclick = resetExpenseForm;
+                btn.parentNode.appendChild(cancelBtn);
+            }
+        }
+
+        function updateExpense(id) {
+            const dateInput = document.getElementById('expenseDate');
+            const catSelect = document.getElementById('expenseCategorySelect');
+            const descInput = document.getElementById('expenseDesc');
+            const amtInput = document.getElementById('expenseAmount');
+
+            const date = dateInput.value;
+            const category = catSelect.value;
+            const description = descInput.value.trim();
+            const amount = parseFloat(amtInput.value);
+
+            if (!date || !category || !description || isNaN(amount)) {
+                alert("Please fill out all fields.");
+                return;
+            }
+
+            databaseArray = databaseArray.map(item => 
+                item.id === id 
+                    ? {
+                        ...item,
+                        updatedAt: Date.now(),
+                        data: { ...item.data, date, category, description, amount }
+                      }
+                    : item
+            );
+
+            updateDataState(databaseArray, true);
+            pullAndMergeCloudData();
+            resetExpenseForm();
+        }
+
+        function resetExpenseForm() {
+            document.getElementById('expenseDesc').value = '';
+            document.getElementById('expenseAmount').value = '';
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('expenseDate').value = today;
+
+            const btn = document.getElementById('expenseSubmitBtn');
+            btn.textContent = "Add Expense";
+            btn.onclick = null;
+            
+            const cancelBtn = document.getElementById('expenseCancelBtn');
+            if (cancelBtn) cancelBtn.remove();
+        }
+
+        function deleteExpense(id) {
+            if (!confirm("Are you sure you want to delete this expense?")) return;
+            databaseArray = databaseArray.map(item => 
+                item.id === id ? { ...item, deleted: true, updatedAt: Date.now() } : item
+            );
+            updateDataState(databaseArray, true);
+            pullAndMergeCloudData();
+        }
+
+        function clearAllData() {
+            if (!confirm("Are you sure you want to clear all data? This will soft-delete all records locally and sync the deletion to your cloud drive.")) return;
+            databaseArray = databaseArray.map(item => ({ ...item, deleted: true, updatedAt: Date.now() }));
+            updateDataState(databaseArray, true);
+            pullAndMergeCloudData();
+        }
+
+        function render() {
+            const activeCategories = databaseArray.filter(item => item.table === 'categories' && !item.deleted);
+            const activeExpenses = databaseArray.filter(item => item.table === 'expenses' && !item.deleted);
+
+            const categoryTotals = {};
+            activeCategories.forEach(cat => {
+                categoryTotals[cat.data.categoryName] = 0;
+            });
+            activeExpenses.forEach(exp => {
+                if (categoryTotals[exp.data.category] !== undefined) {
+                    categoryTotals[exp.data.category] += exp.data.amount;
+                }
+            });
+
+            let totalBudget = 0;
+            activeCategories.forEach(cat => {
+                totalBudget += cat.data.budgetAmount;
+            });
+
+            let totalExpense = 0;
+            activeExpenses.forEach(exp => {
+                totalExpense += exp.data.amount;
+            });
+
+            const netBalance = totalBudget - totalExpense;
+
+            document.getElementById('metricTotalBudget').textContent = `$${totalBudget.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('metricTotalExpense').textContent = `$${totalExpense.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            
+            const balanceEl = document.getElementById('metricNetBalance');
+            balanceEl.textContent = `$${netBalance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            if (netBalance < 0) {
+                balanceEl.className = "metric-value text-danger glow-red";
+            } else {
+                balanceEl.className = "metric-value text-success glow-green";
+            }
+
+            const summaryTableBody = document.getElementById('categorySummaryTableBody');
+            summaryTableBody.innerHTML = '';
+            
+            activeCategories.forEach(cat => {
+                const actual = categoryTotals[cat.data.categoryName] || 0;
+                const left = cat.data.budgetAmount - actual;
+                const isOverBudget = left < 0;
+                
+                const tr = document.createElement('tr');
+                if (isOverBudget) tr.className = 'row-over-budget';
+                tr.innerHTML = `
+                    <td class="font-medium">${escapeHTML(cat.data.categoryName)}</td>
+                    <td>$${cat.data.budgetAmount.toFixed(2)}</td>
+                    <td class="font-medium ${actual > 0 ? 'text-orange' : ''}">$${actual.toFixed(2)}</td>
+                    <td class="font-bold ${isOverBudget ? 'text-danger' : 'text-success'}">$${left.toFixed(2)}</td>
+                    <td>
+                        <div class="table-actions">
+                            <button class="btn-icon" onclick="editCategory('${cat.id}')" title="Edit Category">✏️</button>
+                            <button class="btn-icon text-danger-text" onclick="deleteCategory('${cat.id}')" title="Delete Category">🗑️</button>
+                        </div>
+                    </td>
+                `;
+                summaryTableBody.appendChild(tr);
+            });
+
+            const categorySelect = document.getElementById('expenseCategorySelect');
+            const savedSelectedVal = categorySelect.value;
+            categorySelect.innerHTML = '<option value="" disabled selected>Select Category</option>';
+            activeCategories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.data.categoryName;
+                opt.textContent = cat.data.categoryName;
+                categorySelect.appendChild(opt);
+            });
+            if (savedSelectedVal && activeCategories.find(c => c.data.categoryName === savedSelectedVal)) {
+                categorySelect.value = savedSelectedVal;
+            }
+
+            const expenseTableBody = document.getElementById('expenseTrackerTableBody');
+            expenseTableBody.innerHTML = '';
+            
+            const sortedExpenses = [...activeExpenses].sort((a, b) => new Date(b.data.date) - new Date(a.data.date));
+            
+            sortedExpenses.forEach(exp => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escapeHTML(exp.data.date)}</td>
+                    <td><span class="category-badge">${escapeHTML(exp.data.category)}</span></td>
+                    <td>${escapeHTML(exp.data.description)}</td>
+                    <td class="font-bold">$${exp.data.amount.toFixed(2)}</td>
+                    <td>
+                        <div class="table-actions">
+                            <button class="btn-icon" onclick="editExpense('${exp.id}')" title="Edit Expense">✏️</button>
+                            <button class="btn-icon text-danger-text" onclick="deleteExpense('${exp.id}')" title="Delete Expense">🗑️</button>
+                        </div>
+                    </td>
+                `;
+                expenseTableBody.appendChild(tr);
+            });
+
+            const ctx = document.getElementById('expenseChart');
+            if (ctx) {
+                const labels = activeCategories.map(cat => cat.data.categoryName);
+                const chartData = activeCategories.map(cat => categoryTotals[cat.data.categoryName] || 0);
+                const totalSpentOnChart = chartData.reduce((a, b) => a + b, 0);
+
+                if (expenseChartInstance) {
+                    expenseChartInstance.destroy();
+                }
+
+                if (activeCategories.length === 0 || totalSpentOnChart === 0) {
+                    expenseChartInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['No Active Expenses'],
+                            datasets: [{
+                                data: [1],
+                                backgroundColor: ['#1e293b'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { enabled: false }
+                            },
+                            cutout: '75%'
+                        }
+                    });
+                } else {
+                    const colorPalette = [
+                        '#818cf8', 
+                        '#34d399', 
+                        '#fbbf24', 
+                        '#f87171', 
+                        '#38bdf8', 
+                        '#c084fc', 
+                        '#f472b6'  
+                    ];
+
+                    expenseChartInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: chartData,
+                                backgroundColor: labels.map((_, i) => colorPalette[i % colorPalette.length]),
+                                borderColor: '#131a2c',
+                                borderWidth: 2,
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'right',
+                                    labels: {
+                                        color: '#f8fafc',
+                                        font: {
+                                            family: "'Inter', sans-serif",
+                                            size: 11
+                                        },
+                                        boxWidth: 10,
+                                        padding: 8
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const value = context.raw;
+                                            const percent = ((value / totalSpentOnChart) * 100).toFixed(1);
+                                            return ` ${context.label}: $${value.toFixed(2)} (${percent}%)`;
+                                        }
+                                    }
+                                }
+                            },
+                            cutout: '70%'
+                        }
+                    });
+                }
+            }
+        }
+
+        const CLIENT_ID = '305632493984-9q07n0i677ku1btdds1scke8pam5ag3s.apps.googleusercontent.com';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
+
+        let tokenClient;
+        let gapiInited = false;
+        let gisimInited = false;
+        let accessToken = null;
+        let cloudFileId = null;
+        let silentRefreshTimeout = null;
+
+        function setSyncStatus(text, type = '') {
+            const el = document.getElementById('syncStatusIndicator');
+            if (el) {
+                if (!text) {
+                    el.style.display = 'none';
+                } else {
+                    el.style.display = 'inline-flex';
+                    el.innerText = text;
+                    el.className = 'sync-status ' + type;
+                    
+                    if (type !== 'error') {
+                        el.style.cursor = 'default';
+                        el.onclick = null;
+                    }
+                }
+            }
+        }
+
+        function gapiLoaded() {
+            gapi.load('client', async () => {
+                await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
+                gapiInited = true;
+                evaluateRoutingSession();
+            });
+        }
+
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: async (resp) => {
+                    
+                    if (silentRefreshTimeout) {
+                        clearTimeout(silentRefreshTimeout);
+                        silentRefreshTimeout = null;
+                    }
+
+                    if (resp.error !== undefined) {
+                        triggerReconnectState();
+                        return;
+                    }
+                    
+                    accessToken = resp.access_token;
+                    gapi.client.setToken({ access_token: accessToken });
+                    
+                    localStorage.setItem('google_access_token', accessToken);
+                    localStorage.setItem('google_token_expiry', (Date.now() + (resp.expires_in * 1000)).toString());
+                    localStorage.setItem('has_linked_google', 'true');
+                    
+                    updateAuthUI(true);
+                    setSyncStatus("Cloud Synced ✅", "active");
+                    
+                    const statusEl = document.getElementById('syncStatusIndicator');
+                    if (statusEl) { statusEl.style.cursor = 'default'; statusEl.onclick = null; }
+                    
+                    await pullAndMergeCloudData();
+                },
+            });
+            gisimInited = true;
+            evaluateRoutingSession();
+        }
+        window.addEventListener('load', () => { gapiLoaded(); gisLoaded(); });
+
+        function evaluateRoutingSession() {
+            if (!gapiInited || !gisimInited) return;
+
+            if (localStorage.getItem('has_linked_google') === 'true') {
+                const cachedToken = localStorage.getItem('google_access_token');
+                const expiry = parseInt(localStorage.getItem('google_token_expiry') || '0');
+
+                if (cachedToken && Date.now() < expiry) {
+                    accessToken = cachedToken;
+                    gapi.client.setToken({ access_token: accessToken });
+                    updateAuthUI(true);
+                    setSyncStatus("Cloud Synced ✅", "active");
+                    pullAndMergeCloudData(); 
+                } else {
+                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+                    updateAuthUI(true);
+
+                    if (isMobile) {
+                        triggerReconnectState();
+                    } else {
+                        setSyncStatus("Reconnecting...", "active");
+                        
+                        silentRefreshTimeout = setTimeout(() => {
+                            console.warn("Silent refresh timed out. Forcing manual reconnect button.");
+                            triggerReconnectState();
+                        }, 4000);
+
+                        tokenClient.requestAccessToken({ prompt: 'none' }); 
+                    }
+                }
+            } else {
+                updateAuthUI(false);
+            }
+        }
+        
+        function triggerReconnectState() {
+            const statusEl = document.getElementById('syncStatusIndicator');
+            setSyncStatus("Session Expired - Tap to Reconnect 🔄", "error");
+            
+            statusEl.style.cursor = "pointer";
+            statusEl.onclick = () => {
+                setSyncStatus("Connecting...", "active");
+                tokenClient.requestAccessToken({ prompt: '' }); 
+            };
+        }
+
+        function handleAuthFailure() {
+            localStorage.removeItem('google_access_token');
+            updateAuthUI(false);
+        }
+        
+        function updateAuthUI(isConnected) {
+            const authBtn = document.getElementById('authBtn');
+            if (isConnected) {
+                authBtn.textContent = 'Disconnect';
+                authBtn.className = 'btn-secondary btn-sm btn-danger-text';
+            } else {
+                authBtn.textContent = 'Connect Drive';
+                authBtn.className = 'btn-primary btn-sm';
+                setSyncStatus("", "");
+            }
+        }
+
+        function handleAuthClick() {
+            if (localStorage.getItem('has_linked_google') === 'true') {
+                accessToken = null;
+                localStorage.setItem('has_linked_google', 'false');
+                localStorage.removeItem('google_access_token');
+                localStorage.removeItem('google_token_expiry');
+                updateAuthUI(false);
+                databaseArray = [];
+                render();
+            } else {
+                if (!gapiInited || !gisimInited) return alert("System booting. Please retry in a moment.");
+                setSyncStatus("Connecting...", "active");
+                tokenClient.requestAccessToken({ prompt: 'select_account consent' });
+            }
+        }
+        
+        async function pullAndMergeCloudData() {
+            if (!accessToken) return;
+            try {
+                const response = await gapi.client.drive.files.list({
+                    q: "name = 'expensetracker_backup.json' and trashed = false",
+                    spaces: 'appDataFolder',
+                    fields: 'files(id, name)'
+                });
+                
+                const files = response.result.files;
+                cloudFileId = files.length > 0 ? files[0].id : null;
+
+                if (cloudFileId) {
+                    const fileData = await gapi.client.drive.files.get({ fileId: cloudFileId, alt: 'media' });
+                    const remotePayload = fileData.result;
+
+                    if (remotePayload && remotePayload.records) {
+                        const cloudRecords = remotePayload.records;
+                        const mergedMap = new Map();
+                        
+                        cloudRecords.forEach(item => mergedMap.set(item.id, item));
+                        
+                        let localHasNewerEdits = false;
+                        databaseArray.forEach(localItem => {
+                            const cloudItem = mergedMap.get(localItem.id);
+                            if (!cloudItem || (localItem.updatedAt > (cloudItem.updatedAt || 0))) {
+                                mergedMap.set(localItem.id, localItem);
+                                localHasNewerEdits = true;
+                            }
+                        });
+                        
+                        const finalMergedRecords = Array.from(mergedMap.values());
+                        updateDataState(finalMergedRecords, true);
+                        
+                        if (localHasNewerEdits) await autoUploadToCloud();
+                    }
+                } else {
+                    await autoUploadToCloud();
+                }
+                setSyncStatus("Cloud Synced ✅", "active");
+            } catch (err) {
+                console.error("Sync pull execution exception:", err);
+                if (err.status === 401) handleAuthFailure();
+            }
+        }
+
+        async function autoUploadToCloud() {
+            if (localStorage.getItem('has_linked_google') !== 'true' || !accessToken) return;
+            setSyncStatus("Saving to Cloud...", "active");
+            
+            try {
+                if (!cloudFileId) {
+                    const response = await gapi.client.drive.files.list({
+                        q: "name = 'expensetracker_backup.json' and trashed = false",
+                        spaces: 'appDataFolder',
+                        fields: 'files(id)'
+                    });
+                    if (response.result.files.length > 0) {
+                        cloudFileId = response.result.files[0].id;
+                    } else {
+                        const metaResp = await gapi.client.drive.files.create({
+                            resource: { name: 'expensetracker_backup.json', parents: ['appDataFolder'] },
+                            fields: 'id'
+                        });
+                        cloudFileId = metaResp.result.id;
+                    }
+                }
+                
+                const payload = { records: databaseArray };
+
+                await gapi.client.request({
+                    path: `https://www.googleapis.com/upload/drive/v3/files/${cloudFileId}?uploadType=media`,
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                setSyncStatus("Cloud Synced ✅", "active");
+            } catch (err) {
+                console.error("Cloud engine commit intercept:", err);
+                setSyncStatus("Sync Paused ⚠️", "error");
+                if (err.status === 401) handleAuthFailure();
+            }
+        }
+        
+        let lastInteractionSyncTime = Date.now(); 
+        const SYNC_COOLDOWN_MS = 300000; 
+
+        function handleMicroInteraction() {
+            if (localStorage.getItem('has_linked_google') !== 'true' || !accessToken) return;
+
+            const now = Date.now();
+            if (now - lastInteractionSyncTime > SYNC_COOLDOWN_MS) {
+                lastInteractionSyncTime = now; 
+                setSyncStatus("Checking...", "active");
+                pullAndMergeCloudData();
+            }
+        }
+
+        window.addEventListener('mousemove', handleMicroInteraction);
+        window.addEventListener('keydown', handleMicroInteraction);
+        window.addEventListener('touchstart', handleMicroInteraction, { passive: true });
+        window.addEventListener('focus', handleMicroInteraction);
+    </script>
+</body>
+
+</html>
