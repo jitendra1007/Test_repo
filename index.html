@@ -473,7 +473,7 @@
                 <div class="data-actions" style="margin-left: 0;">
                     <button class="btn-secondary" onclick="exportData()">Export JSON</button>
                     <button class="btn-secondary" onclick="document.getElementById('importFile').click()">Import JSON</button>
-                    <input type="file" id="importFile" accept=".json" onchange="triggerImportWithConfirm(event)">
+                    <input type="file" id="importFile" accept=".json" onchange="triggerImportWithConfirm(event)" style="display: none;">
                     <button class="btn-secondary btn-danger-text" onclick="clearAllData()">Clear All Data</button>
                 </div>
             </div>
@@ -578,7 +578,7 @@
                     const parsed = JSON.parse(e.target.result);
                     if (Array.isArray(parsed)) { 
                         updateDataState(parsed, true); 
-                        autoUploadToCloud(); 
+                        pullAndMergeCloudData(); 
                     } else {
                         alert("Invalid backup file structure.");
                     }
