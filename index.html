@@ -1983,19 +1983,32 @@
         .filter(r => r.table === 'assignments' && !r.deleted)
         .map(r => Object.assign({ id: r.id }, r.data));
 
-      // 3. Extract config
-      let configRecord = databaseArray.find(r => r.table === 'config' && !r.deleted);
-      if (!configRecord) {
-        configRecord = {
-          id: 'config_record',
-          table: 'config',
-          updatedAt: Date.now(),
-          deleted: false,
-          data: JSON.parse(JSON.stringify(DEFAULT_STATE.config))
-        };
-        databaseArray.push(configRecord);
-        localStorage.setItem('generic_app_data', JSON.stringify(databaseArray));
-      }
+      // 3. Extract config categories
+      const extractConfig = (tableName, defaults) => {
+        const list = databaseArray.filter(r => r.table === tableName);
+        if (list.length === 0) {
+          const now = Date.now();
+          defaults.forEach((val, idx) => {
+            databaseArray.push({
+              id: tableName + '_' + idx + '_' + Math.random().toString(36).slice(2, 6),
+              table: tableName,
+              updatedAt: now,
+              deleted: false,
+              data: { value: val }
+            });
+          });
+          localStorage.setItem('generic_app_data', JSON.stringify(databaseArray));
+          return defaults;
+        }
+        return list.filter(r => !r.deleted).map(r => r.data.value);
+      };
+
+      const config = {
+        status: extractConfig('config_status', DEFAULT_STATE.config.status),
+        priority: extractConfig('config_priority', DEFAULT_STATE.config.priority),
+        courses: extractConfig('config_course', DEFAULT_STATE.config.courses),
+        grades: extractConfig('config_grade', DEFAULT_STATE.config.grades)
+      };
 
       // 4. Load UI options from local storage
       let localUi = {};
@@ -2008,7 +2021,7 @@
 
       return {
         assignments: assignments,
-        config: configRecord.data,
+        config: config,
         ui: Object.assign({}, DEFAULT_STATE.ui, localUi)
       };
     }
@@ -2451,51 +2464,69 @@
       pullAndMergeCloudData();
     }
 
-    function saveConfig() {
-      const now = Date.now();
-      const configIdx = databaseArray.findIndex(r => r.table === 'config' && !r.deleted);
-      if (configIdx >= 0) {
-        databaseArray[configIdx] = {
-          ...databaseArray[configIdx],
-          updatedAt: now,
-          data: JSON.parse(JSON.stringify(state.config))
-        };
-      } else {
-        databaseArray.push({
-          id: 'config_record',
-          table: 'config',
-          updatedAt: now,
-          deleted: false,
-          data: JSON.parse(JSON.stringify(state.config))
-        });
-      }
-
-      localStorage.setItem('generic_app_data', JSON.stringify(databaseArray));
-      state = load();
-      render();
-      pullAndMergeCloudData();
+    function configTable(key) {
+      const mapping = {
+        'status': 'config_status',
+        'priority': 'config_priority',
+        'courses': 'config_course',
+        'grades': 'config_grade'
+      };
+      return mapping[key];
     }
 
     function addConfig(key, val) {
       val = (val || '').trim();
       if (!val) return;
-      state.config[key] = state.config[key] || [];
-      if (!state.config[key].includes(val)) {
-        state.config[key].push(val);
-      }
-      saveConfig();
+      const tableName = configTable(key);
+
+      const activeValues = databaseArray
+        .filter(r => r.table === tableName && !r.deleted)
+        .map(r => r.data.value);
+      if (activeValues.includes(val)) return;
+
+      const now = Date.now();
+      databaseArray.push({
+        id: 'cfg_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36),
+        table: tableName,
+        updatedAt: now,
+        deleted: false,
+        data: { value: val }
+      });
+
+      updateDataState(databaseArray, true);
+      pullAndMergeCloudData();
     }
 
     function updateConfig(key, idx, val) {
       val = (val || '').trim();
       if (!val) return;
-      state.config[key][idx] = val;
-      saveConfig();
+      const tableName = configTable(key);
+      const activeRecords = databaseArray.filter(r => r.table === tableName && !r.deleted);
+      const targetRecord = activeRecords[idx];
+      if (!targetRecord) return;
+
+      const now = Date.now();
+      databaseArray = databaseArray.map(r =>
+        r.id === targetRecord.id ? { ...r, updatedAt: now, data: { value: val } } : r
+      );
+
+      updateDataState(databaseArray, true);
+      pullAndMergeCloudData();
     }
 
     function deleteConfig(key, idx) {
-      state.config[key].splice(idx, 1);
-      saveConfig();
+      const tableName = configTable(key);
+      const activeRecords = databaseArray.filter(r => r.table === tableName && !r.deleted);
+      const targetRecord = activeRecords[idx];
+      if (!targetRecord) return;
+
+      const now = Date.now();
+      databaseArray = databaseArray.map(r =>
+        r.id === targetRecord.id ? { ...r, deleted: true, updatedAt: now } : r
+      );
+
+      updateDataState(databaseArray, true);
+      pullAndMergeCloudData();
     }
 
     function clearAllData() {
