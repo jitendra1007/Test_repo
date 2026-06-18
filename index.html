@@ -2152,8 +2152,13 @@
           } else {
             el.style.cursor = "pointer";
             el.onclick = () => {
-              setSyncStatus("Connecting...", "active");
-              tokenClient.requestAccessToken({ prompt: '' });
+              if (needsManualReconnect) {
+                setSyncStatus("Connecting...", "active");
+                tokenClient.requestAccessToken({ prompt: '' });
+              } else {
+                setSyncStatus("Syncing...", "active");
+                pullAndMergeCloudData();
+              }
             };
           }
         }
@@ -2336,6 +2341,7 @@
         setSyncStatus("Cloud Synced ✅", "active");
       } catch (err) {
         console.error("Sync pull execution exception:", err);
+        setSyncStatus("Sync Paused ⚠️", "error");
         if (err.status === 401) {
           localStorage.setItem('google_token_expiry', '0');
           evaluateRoutingSession();
