@@ -1987,12 +1987,11 @@
       const extractConfig = (tableName, defaults) => {
         const list = databaseArray.filter(r => r.table === tableName);
         if (list.length === 0) {
-          const now = Date.now();
           defaults.forEach((val, idx) => {
             databaseArray.push({
-              id: tableName + '_' + idx + '_' + Math.random().toString(36).slice(2, 6),
+              id: tableName + '_' + idx, // Deterministic ID to prevent sync duplicates
               table: tableName,
-              updatedAt: now,
+              updatedAt: 0, // Set to 0 so cloud modifications/deletions will always override this baseline
               deleted: false,
               data: { value: val }
             });
