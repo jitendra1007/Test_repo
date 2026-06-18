@@ -1971,7 +1971,7 @@
 
     function load() {
       // 1. Load databaseArray
-      const storedData = localStorage.getItem('generic_app_data');
+      const storedData = localStorage.getItem('edutracker_local_data');
       if (storedData) {
         try { databaseArray = JSON.parse(storedData); } catch (e) { databaseArray = []; }
       } else {
@@ -1997,7 +1997,7 @@
               data: { value: val }
             });
           });
-          localStorage.setItem('generic_app_data', JSON.stringify(databaseArray));
+          localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
           return defaults;
         }
         return list.filter(r => !r.deleted).map(r => r.data.value);
@@ -2033,7 +2033,7 @@
     function updateDataState(newData, saveLocal = true) {
       databaseArray = newData;
       if (saveLocal) {
-        localStorage.setItem('generic_app_data', JSON.stringify(databaseArray));
+        localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
       }
       state = load();
       render();
@@ -2270,7 +2270,7 @@
 
         // Reset state & databaseArray locally
         databaseArray = [];
-        localStorage.setItem('generic_app_data', JSON.stringify([]));
+        localStorage.setItem('edutracker_local_data', JSON.stringify([]));
         state = load();
         render();
       } else {
@@ -2446,7 +2446,7 @@
         });
       }
 
-      localStorage.setItem('generic_app_data', JSON.stringify(databaseArray));
+      localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
       state = load();
       render();
       pullAndMergeCloudData();
@@ -2458,7 +2458,7 @@
         (r.id === id && r.table === 'assignments') ? { ...r, deleted: true, updatedAt: now } : r
       );
 
-      localStorage.setItem('generic_app_data', JSON.stringify(databaseArray));
+      localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
       state = load();
       render();
       pullAndMergeCloudData();
@@ -2533,7 +2533,7 @@
       if (confirm("Are you sure you want to delete all local and cloud data? This cannot be undone.")) {
         const now = Date.now();
         databaseArray = databaseArray.map(r => ({ ...r, deleted: true, updatedAt: now }));
-        localStorage.setItem('generic_app_data', JSON.stringify(databaseArray));
+        localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
         localStorage.removeItem('edutracker.ui');
         state = load();
         render();
