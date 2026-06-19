@@ -1584,25 +1584,44 @@
     }
 
     .sync-status-badge {
+      position: fixed;
+      top: 16px;
+      right: 24px;
+      z-index: 200;
       font-size: 12px;
       font-weight: 600;
-      padding: 6px 12px;
-      border-radius: 8px;
+      padding: 8px 16px;
+      border-radius: 10px;
       background-color: #f1f5f9;
       color: #64748b;
       display: inline-flex;
       align-items: center;
+      justify-content: center;
+      text-align: center;
+      white-space: pre-line;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+      border: 1px solid #e2e8f0;
+      transition: all 0.2s ease;
+      line-height: 1.4;
     }
 
     .sync-status-badge.active {
       background-color: #e0f2fe;
       color: #0369a1;
+      border-color: #bae6fd;
     }
 
     .sync-status-badge.error {
       background-color: #fef2f2;
       color: #dc2626;
+      border-color: #fecaca;
       cursor: pointer;
+    }
+
+    .sync-status-badge.error:hover {
+      background-color: #fee2e2;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(220, 38, 38, 0.12);
     }
 
     .backup-note {
@@ -1618,7 +1637,21 @@
       pointer-events: none;
     }
 
+    @media (min-width: 769px) {
+      .page-header,
+      .cal-header {
+        padding-right: 180px;
+      }
+    }
+
     @media (max-width: 768px) {
+      .sync-status-badge {
+        position: fixed;
+        top: 8px;
+        right: 8px;
+        padding: 6px 10px;
+        font-size: 11px;
+      }
       .sidebar {
         width: 64px;
       }
@@ -1788,6 +1821,7 @@
 
 <body>
   <div id="app" class="app"></div>
+  <div id="syncStatusIndicator" class="sync-status-badge" style="display: none;"></div>
   <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display:none">
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
@@ -1970,8 +2004,16 @@
     });
 
     function load() {
-      // 1. Load databaseArray
-      const storedData = localStorage.getItem('edutracker_local_data');
+      // 1. Load databaseArray with migration from old key
+      let storedData = localStorage.getItem('edutracker_local_data2');
+      if (!storedData) {
+        const oldData = localStorage.getItem('edutracker_local_data');
+        if (oldData) {
+          storedData = oldData;
+          localStorage.setItem('edutracker_local_data2', oldData);
+        }
+      }
+
       if (storedData) {
         try { databaseArray = JSON.parse(storedData); } catch (e) { databaseArray = []; }
       } else {
@@ -1996,7 +2038,7 @@
               data: { value: val }
             });
           });
-          localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
+          localStorage.setItem('edutracker_local_data2', JSON.stringify(databaseArray));
           return defaults;
         }
         return list.filter(r => !r.deleted).map(r => r.data.value);
@@ -2032,7 +2074,7 @@
     function updateDataState(newData, saveLocal = true) {
       databaseArray = newData;
       if (saveLocal) {
-        localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
+        localStorage.setItem('edutracker_local_data2', JSON.stringify(databaseArray));
       }
       state = load();
       if (!ui.isAdding && !ui.editingId && !ui.editingConfig && !ui.activeMoreDate) {
@@ -2045,7 +2087,7 @@
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(databaseArray, null, 2));
       const a = document.createElement('a');
       a.setAttribute("href", dataStr);
-      a.setAttribute("download", "edutracker_export.json");
+      a.setAttribute("download", "edutracker_export2.json");
       a.click();
     }
 
@@ -2152,6 +2194,10 @@
           } else {
             el.style.cursor = "pointer";
             el.onclick = () => {
+              if (!navigator.onLine) {
+                alert("You are still offline. Please connect to the internet and try again.");
+                return;
+              }
               if (needsManualReconnect) {
                 setSyncStatus("Connecting...", "active");
                 tokenClient.requestAccessToken({ prompt: '' });
@@ -2213,6 +2259,12 @@
       if (!gapiInited || !gisimInited) return;
 
       if (localStorage.getItem('has_linked_google') === 'true') {
+        if (!navigator.onLine) {
+          updateAuthUI(true);
+          setSyncStatus("Sync paused - Offline\nTap to reconnect", "error");
+          return;
+        }
+
         const cachedToken = localStorage.getItem('google_access_token');
         const expiry = parseInt(localStorage.getItem('google_token_expiry') || '0');
 
@@ -2289,11 +2341,12 @@
 
         // Reset state & databaseArray locally
         databaseArray = [];
-        localStorage.setItem('edutracker_local_data', JSON.stringify([]));
+        localStorage.setItem('edutracker_local_data2', JSON.stringify([]));
         state = load();
         render();
       } else {
         if (!gapiInited || !gisimInited) return alert("System booting. Please retry in a moment.");
+        if (!navigator.onLine) return alert("You are offline. Please connect to the internet to link Google Drive.");
         setSyncStatus("Connecting...", "active");
         tokenClient.requestAccessToken({ prompt: 'select_account consent' });
       }
@@ -2301,9 +2354,13 @@
 
     async function pullAndMergeCloudData() {
       if (!accessToken) return;
+      if (!navigator.onLine) {
+        setSyncStatus("Sync paused - Offline\nTap to reconnect", "error");
+        return;
+      }
       try {
         const response = await gapi.client.drive.files.list({
-          q: "name = 'edutracker_backup.json' and trashed = false",
+          q: "name = 'edutracker_backup2.json' and trashed = false",
           spaces: 'appDataFolder',
           fields: 'files(id, name)'
         });
@@ -2341,22 +2398,30 @@
         setSyncStatus("Cloud Synced ✅", "active");
       } catch (err) {
         console.error("Sync pull execution exception:", err);
-        setSyncStatus("Sync Paused ⚠️", "error");
-        if (err.status === 401) {
-          localStorage.setItem('google_token_expiry', '0');
-          evaluateRoutingSession();
+        if (!navigator.onLine) {
+          setSyncStatus("Sync paused - Offline\nTap to reconnect", "error");
+        } else {
+          setSyncStatus("Sync Paused ⚠️", "error");
+          if (err.status === 401) {
+            localStorage.setItem('google_token_expiry', '0');
+            evaluateRoutingSession();
+          }
         }
       }
     }
 
     async function autoUploadToCloud() {
       if (localStorage.getItem('has_linked_google') !== 'true' || !accessToken) return;
+      if (!navigator.onLine) {
+        setSyncStatus("Sync paused - Offline\nTap to reconnect", "error");
+        return;
+      }
       setSyncStatus("Saving to Cloud...", "active");
 
       try {
         if (!cloudFileId) {
           const response = await gapi.client.drive.files.list({
-            q: "name = 'edutracker_backup.json' and trashed = false",
+            q: "name = 'edutracker_backup2.json' and trashed = false",
             spaces: 'appDataFolder',
             fields: 'files(id)'
           });
@@ -2364,7 +2429,7 @@
             cloudFileId = response.result.files[0].id;
           } else {
             const metaResp = await gapi.client.drive.files.create({
-              resource: { name: 'edutracker_backup.json', parents: ['appDataFolder'] },
+              resource: { name: 'edutracker_backup2.json', parents: ['appDataFolder'] },
               fields: 'id'
             });
             cloudFileId = metaResp.result.id;
@@ -2383,10 +2448,14 @@
         setSyncStatus("Cloud Synced ✅", "active");
       } catch (err) {
         console.error("Cloud engine commit intercept:", err);
-        setSyncStatus("Sync Paused ⚠️", "error");
-        if (err.status === 401) {
-          localStorage.setItem('google_token_expiry', '0');
-          evaluateRoutingSession();
+        if (!navigator.onLine) {
+          setSyncStatus("Sync paused - Offline\nTap to reconnect", "error");
+        } else {
+          setSyncStatus("Sync Paused ⚠️", "error");
+          if (err.status === 401) {
+            localStorage.setItem('google_token_expiry', '0');
+            evaluateRoutingSession();
+          }
         }
       }
     }
@@ -2400,6 +2469,7 @@
     function handleMicroInteraction() {
       if (localStorage.getItem('has_linked_google') !== 'true' || !accessToken) return;
       if (isRefreshingToken || needsManualReconnect) return;
+      if (!navigator.onLine) return;
 
       const expiry = parseInt(localStorage.getItem('google_token_expiry') || '0');
       if (Date.now() >= expiry) {
@@ -2419,6 +2489,19 @@
     window.addEventListener('keydown', handleMicroInteraction);
     window.addEventListener('touchstart', handleMicroInteraction, { passive: true });
     window.addEventListener('focus', handleMicroInteraction);
+
+    window.addEventListener('offline', () => {
+      if (localStorage.getItem('has_linked_google') === 'true') {
+        setSyncStatus("Sync paused - Offline\nTap to reconnect", "error");
+      }
+    });
+
+    window.addEventListener('online', () => {
+      if (localStorage.getItem('has_linked_google') === 'true') {
+        setSyncStatus("Connecting...", "active");
+        evaluateRoutingSession();
+      }
+    });
 
     // =========================================================================
     // SECTION 4: DATA MUTATION & SETUP FUNCTIONS
@@ -2467,7 +2550,7 @@
         });
       }
 
-      localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
+      localStorage.setItem('edutracker_local_data2', JSON.stringify(databaseArray));
       state = load();
       render();
       pullAndMergeCloudData();
@@ -2479,7 +2562,7 @@
         (r.id === id && r.table === 'assignments') ? { ...r, deleted: true, updatedAt: now } : r
       );
 
-      localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
+      localStorage.setItem('edutracker_local_data2', JSON.stringify(databaseArray));
       state = load();
       render();
       pullAndMergeCloudData();
@@ -2554,7 +2637,7 @@
       if (confirm("Are you sure you want to delete all local and cloud data? This cannot be undone.")) {
         const now = Date.now();
         databaseArray = databaseArray.map(r => ({ ...r, deleted: true, updatedAt: now }));
-        localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
+        localStorage.setItem('edutracker_local_data2', JSON.stringify(databaseArray));
         localStorage.removeItem('edutracker.ui');
         state = load();
         render();
@@ -2570,7 +2653,7 @@
 
     function render() {
       const root = document.getElementById('app');
-      
+
       // Capture scroll positions of any scrollable container before render
       const scrollPositions = [];
       const tabChanged = lastRenderedTab !== state.ui.activeTab;
@@ -2596,9 +2679,9 @@
       else body = renderDashboard();
       const modal = (ui.isAdding || ui.editingId) ? renderModal() : '';
       const moreModal = ui.activeMoreDate ? renderMoreModal() : '';
-      
+
       root.innerHTML = renderSidebar() + '<main class="main-area">' + body + modal + moreModal + '</main>';
-      
+
       bindEvents();
 
       if (!tabChanged) {
@@ -2869,7 +2952,6 @@
         '<p class="backup-desc">Backup data on your Google Drive</p>' +
         '<div class="backup-actions-auto">' +
         '<button id="authBtn" class="btn-connect-drive" onclick="handleAuthClick()">Connect to Google Drive</button>' +
-        '<div id="syncStatusIndicator" class="sync-status-badge" style="display: none;"></div>' +
         '</div>' +
         '<p class="backup-note">Connect using the same account on other devices for automatic sync. Mobile/tablet needs to be reconnected after one hour.</p>' +
         '</div>' +
