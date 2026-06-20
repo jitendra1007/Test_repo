@@ -1586,12 +1586,18 @@
     .sync-status-badge {
       font-size: 12px;
       font-weight: 600;
-      padding: 6px 12px;
-      border-radius: 8px;
+      padding: 8px 14px;
+      border-radius: 10px;
       background-color: #f1f5f9;
       color: #64748b;
       display: inline-flex;
       align-items: center;
+      justify-content: center;
+      text-align: center;
+      white-space: pre-line;
+      line-height: 1.4;
+      border: 1px solid #e2e8f0;
+      transition: all .2s ease;
     }
 
     .sync-status-badge.active {
@@ -2341,7 +2347,8 @@
         setSyncStatus("Cloud Synced ✅", "active");
       } catch (err) {
         console.error("Sync pull execution exception:", err);
-        setSyncStatus("Sync Paused ⚠️", "error");
+        const msg = !navigator.onLine ? "Sync paused - Offline\nTap to reconnect" : "Sync Paused ⚠️";
+        setSyncStatus(msg, "error");
         if (err.status === 401) {
           localStorage.setItem('google_token_expiry', '0');
           evaluateRoutingSession();
@@ -2383,7 +2390,8 @@
         setSyncStatus("Cloud Synced ✅", "active");
       } catch (err) {
         console.error("Cloud engine commit intercept:", err);
-        setSyncStatus("Sync Paused ⚠️", "error");
+        const msg = !navigator.onLine ? "Sync paused - Offline\nTap to reconnect" : "Sync Paused ⚠️";
+        setSyncStatus(msg, "error");
         if (err.status === 401) {
           localStorage.setItem('google_token_expiry', '0');
           evaluateRoutingSession();
@@ -2767,6 +2775,7 @@
         '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;margin-bottom:8px">' +
         '<div><h2>Academic Overview</h2><p class="subtitle">Manage your active workload</p></div>' +
         '<div class="data-toolbar">' +
+        '<div id="syncStatusIndicator" class="sync-status-badge" style="display: none; margin-right: 8px;"></div>' +
         '<button class="btn-primary" data-act="add">' + icon('plus', 'width="16" height="16"') + ' Add Assignment</button>' +
         '</div>' +
         '</div>' +
@@ -2832,9 +2841,12 @@
       }).join('');
 
       return '<div class="view"><div class="setup">' +
-        '<header class="setup-header">' +
+        '<header class="setup-header" style="display:flex;justify-content:space-between;align-items:center;width:100%">' +
+        '<div style="display:flex;align-items:center;gap:12px">' +
         '<div class="setup-header-icon">' + icon('settings', 'width="24" height="24"') + '</div>' +
         '<div><h1>Workspace Setup</h1><p>Configure your assignment attributes</p></div>' +
+        '</div>' +
+        '<div id="syncStatusIndicator" class="sync-status-badge" style="display: none;"></div>' +
         '</header>' +
         '<div class="setup-grid">' + colsHtml + '</div>' +
 
@@ -2869,7 +2881,6 @@
         '<p class="backup-desc">Backup data on your Google Drive</p>' +
         '<div class="backup-actions-auto">' +
         '<button id="authBtn" class="btn-connect-drive" onclick="handleAuthClick()">Connect to Google Drive</button>' +
-        '<div id="syncStatusIndicator" class="sync-status-badge" style="display: none;"></div>' +
         '</div>' +
         '<p class="backup-note">Connect using the same account on other devices for automatic sync. Mobile/tablet needs to be reconnected after one hour.</p>' +
         '</div>' +
@@ -2935,7 +2946,8 @@
         '<button data-act="cal-next">' + icon('chev-r', 'width="20" height="20"') + '</button>' +
         '</div>' +
         '</div>' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+        '<div id="syncStatusIndicator" class="sync-status-badge" style="display: none;"></div>' +
         '<button class="btn-secondary ' + (state.ui.mondayStart ? 'active' : '') + '" data-act="toggle-monday">' +
         icon('cal-days', 'width="16" height="16"') + ' ' + (state.ui.mondayStart ? 'Monday Start' : 'Sunday Start') + '</button>' +
         '<button class="btn-secondary ' + (state.ui.hideCompleted ? 'active' : '') + '" data-act="toggle-hide">' +
