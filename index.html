@@ -1967,7 +1967,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       // INSTANT UI PRE-LOADER: Flip the button state before Google scripts load
-      if (localStorage.getItem('has_linked_google') === 'true') {
+      if (localStorage.getItem('edutracker_has_linked_google') === 'true') {
         setSyncStatus("Connecting to Drive...", "active");
       }
 
@@ -2200,9 +2200,9 @@
           accessToken = resp.access_token;
           gapi.client.setToken({ access_token: accessToken });
 
-          localStorage.setItem('google_access_token', accessToken);
-          localStorage.setItem('google_token_expiry', (Date.now() + (resp.expires_in * 1000)).toString());
-          localStorage.setItem('has_linked_google', 'true');
+          localStorage.setItem('edutracker_google_access_token', accessToken);
+          localStorage.setItem('edutracker_google_token_expiry', (Date.now() + (resp.expires_in * 1000)).toString());
+          localStorage.setItem('edutracker_has_linked_google', 'true');
 
           updateAuthUI(true);
           setSyncStatus("Cloud Synced ✅", "active");
@@ -2218,9 +2218,9 @@
     function evaluateRoutingSession() {
       if (!gapiInited || !gisimInited) return;
 
-      if (localStorage.getItem('has_linked_google') === 'true') {
-        const cachedToken = localStorage.getItem('google_access_token');
-        const expiry = parseInt(localStorage.getItem('google_token_expiry') || '0');
+      if (localStorage.getItem('edutracker_has_linked_google') === 'true') {
+        const cachedToken = localStorage.getItem('edutracker_google_access_token');
+        const expiry = parseInt(localStorage.getItem('edutracker_google_token_expiry') || '0');
 
         if (cachedToken && Date.now() < expiry) {
           accessToken = cachedToken;
@@ -2262,7 +2262,7 @@
     }
 
     function handleAuthFailure() {
-      localStorage.removeItem('google_access_token');
+      localStorage.removeItem('edutracker_google_access_token');
       updateAuthUI(false);
     }
 
@@ -2283,13 +2283,13 @@
     }
 
     function handleAuthClick() {
-      if (localStorage.getItem('has_linked_google') === 'true') {
+      if (localStorage.getItem('edutracker_has_linked_google') === 'true') {
         accessToken = null;
         isRefreshingToken = false;
         needsManualReconnect = false;
-        localStorage.setItem('has_linked_google', 'false');
-        localStorage.removeItem('google_access_token');
-        localStorage.removeItem('google_token_expiry');
+        localStorage.setItem('edutracker_has_linked_google', 'false');
+        localStorage.removeItem('edutracker_google_access_token');
+        localStorage.removeItem('edutracker_google_token_expiry');
 
         updateAuthUI(false);
 
@@ -2350,14 +2350,14 @@
         const msg = !navigator.onLine ? "Sync paused - Offline\nTap to reconnect" : "Sync Paused ⚠️";
         setSyncStatus(msg, "error");
         if (err.status === 401) {
-          localStorage.setItem('google_token_expiry', '0');
+          localStorage.setItem('edutracker_google_token_expiry', '0');
           evaluateRoutingSession();
         }
       }
     }
 
     async function autoUploadToCloud() {
-      if (localStorage.getItem('has_linked_google') !== 'true' || !accessToken) return;
+      if (localStorage.getItem('edutracker_has_linked_google') !== 'true' || !accessToken) return;
       setSyncStatus("Saving to Cloud...", "active");
 
       try {
@@ -2393,7 +2393,7 @@
         const msg = !navigator.onLine ? "Sync paused - Offline\nTap to reconnect" : "Sync Paused ⚠️";
         setSyncStatus(msg, "error");
         if (err.status === 401) {
-          localStorage.setItem('google_token_expiry', '0');
+          localStorage.setItem('edutracker_google_token_expiry', '0');
           evaluateRoutingSession();
         }
       }
@@ -2406,10 +2406,10 @@
     const SYNC_COOLDOWN_MS = 300000;
 
     function handleMicroInteraction() {
-      if (localStorage.getItem('has_linked_google') !== 'true' || !accessToken) return;
+      if (localStorage.getItem('edutracker_has_linked_google') !== 'true' || !accessToken) return;
       if (isRefreshingToken || needsManualReconnect) return;
 
-      const expiry = parseInt(localStorage.getItem('google_token_expiry') || '0');
+      const expiry = parseInt(localStorage.getItem('edutracker_google_token_expiry') || '0');
       if (Date.now() >= expiry) {
         evaluateRoutingSession();
         return;
@@ -2621,7 +2621,7 @@
       }
 
       // Ensure Drive elements are up-to-date in DOM after rendering
-      const isConnected = localStorage.getItem('has_linked_google') === 'true';
+      const isConnected = localStorage.getItem('edutracker_has_linked_google') === 'true';
       updateAuthUI(isConnected);
       setSyncStatus(currentSyncStatusText, currentSyncStatusType);
     }
@@ -2775,8 +2775,8 @@
         '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;margin-bottom:8px">' +
         '<div><h2>Academic Overview</h2><p class="subtitle">Manage your active workload</p></div>' +
         '<div class="data-toolbar">' +
-        '<div id="syncStatusIndicator" class="sync-status-badge" style="display: none; margin-right: 8px;"></div>' +
         '<button class="btn-primary" data-act="add">' + icon('plus', 'width="16" height="16"') + ' Add Assignment</button>' +
+        '<div id="syncStatusIndicator" class="sync-status-badge" style="display: none; margin-left: 12px;"></div>' +
         '</div>' +
         '</div>' +
         '<div class="stats">' +
@@ -2947,12 +2947,12 @@
         '</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
-        '<div id="syncStatusIndicator" class="sync-status-badge" style="display: none;"></div>' +
         '<button class="btn-secondary ' + (state.ui.mondayStart ? 'active' : '') + '" data-act="toggle-monday">' +
         icon('cal-days', 'width="16" height="16"') + ' ' + (state.ui.mondayStart ? 'Monday Start' : 'Sunday Start') + '</button>' +
         '<button class="btn-secondary ' + (state.ui.hideCompleted ? 'active' : '') + '" data-act="toggle-hide">' +
         icon(state.ui.hideCompleted ? 'eye-off' : 'eye', 'width="16" height="16"') + ' ' +
         (state.ui.hideCompleted ? 'Active Only' : 'Show All') + '</button>' +
+        '<div id="syncStatusIndicator" class="sync-status-badge" style="display: none; margin-left: 12px;"></div>' +
         '</div>' +
         '</header>' +
         '<main class="cal-body">' +
