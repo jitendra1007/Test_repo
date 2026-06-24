@@ -2092,7 +2092,9 @@
         try {
           const parsed = JSON.parse(e.target.result);
           if (Array.isArray(parsed)) {
-            updateDataState(parsed, true);
+            const now = Date.now();
+            const updatedParsed = parsed.map(item => Object.assign({}, item, { updatedAt: now }));
+            updateDataState(updatedParsed, true);
             scheduleCloudSync();
             alert("Data has been successfully imported! ✅");
           } else {
