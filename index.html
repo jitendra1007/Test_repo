@@ -2070,7 +2070,7 @@
           const parsed = JSON.parse(e.target.result);
           if (Array.isArray(parsed)) {
             updateDataState(parsed, true);
-            pullAndMergeCloudData();
+            scheduleCloudSync();
             alert("Data has been successfully imported! ✅");
           } else {
             alert("Import failed: JSON structure is incorrect.");
@@ -2136,6 +2136,11 @@
     let silentRefreshTimeout = null;
     let isRefreshingToken = false;
     let needsManualReconnect = false;
+
+    let syncDebounceTimeout = null;
+    let isSyncingInProgress = false;
+    let hasPendingSyncRequest = false;
+    let hasUnsavedChanges = false;
 
     let currentSyncStatusText = "";
     let currentSyncStatusType = "";
@@ -2306,7 +2311,7 @@
     }
 
     async function pullAndMergeCloudData() {
-      if (!accessToken) return;
+      if (!accessToken) return false;
       try {
         const response = await gapi.client.drive.files.list({
           q: "name = 'edutracker_backup.json' and trashed = false",
@@ -2317,6 +2322,7 @@
         const files = response.result.files;
         cloudFileId = files.length > 0 ? files[0].id : null;
 
+        let success = true;
         if (cloudFileId) {
           const fileData = await gapi.client.drive.files.get({ fileId: cloudFileId, alt: 'media' });
           const remotePayload = fileData.result;
@@ -2339,12 +2345,18 @@
             const finalMergedRecords = Array.from(mergedMap.values());
             updateDataState(finalMergedRecords, true);
 
-            if (localHasNewerEdits) await autoUploadToCloud();
+            if (localHasNewerEdits) {
+              success = await autoUploadToCloud();
+            }
           }
         } else {
-          await autoUploadToCloud();
+          success = await autoUploadToCloud();
         }
-        setSyncStatus("Cloud Synced ✅", "active");
+        if (success) {
+          setSyncStatus("Cloud Synced ✅", "active");
+          return true;
+        }
+        return false;
       } catch (err) {
         console.error("Sync pull execution exception:", err);
         const msg = !navigator.onLine ? "Sync paused - Offline\nTap to reconnect" : "Sync Paused ⚠️";
@@ -2353,11 +2365,12 @@
           localStorage.setItem('edutracker_google_token_expiry', '0');
           evaluateRoutingSession();
         }
+        return false;
       }
     }
 
     async function autoUploadToCloud() {
-      if (localStorage.getItem('edutracker_has_linked_google') !== 'true' || !accessToken) return;
+      if (localStorage.getItem('edutracker_has_linked_google') !== 'true' || !accessToken) return false;
       setSyncStatus("Saving to Cloud...", "active");
 
       try {
@@ -2388,6 +2401,7 @@
         });
 
         setSyncStatus("Cloud Synced ✅", "active");
+        return true;
       } catch (err) {
         console.error("Cloud engine commit intercept:", err);
         const msg = !navigator.onLine ? "Sync paused - Offline\nTap to reconnect" : "Sync Paused ⚠️";
@@ -2395,6 +2409,54 @@
         if (err.status === 401) {
           localStorage.setItem('edutracker_google_token_expiry', '0');
           evaluateRoutingSession();
+        }
+        return false;
+      }
+    }
+
+    function scheduleCloudSync(immediate = false) {
+      if (localStorage.getItem('edutracker_has_linked_google') !== 'true' || !accessToken) return;
+
+      hasUnsavedChanges = true;
+      setSyncStatus("Saving to Cloud...", "active");
+
+      if (syncDebounceTimeout) {
+        clearTimeout(syncDebounceTimeout);
+        syncDebounceTimeout = null;
+      }
+
+      if (immediate) {
+        triggerSyncNow();
+      } else {
+        syncDebounceTimeout = setTimeout(triggerSyncNow, 3000);
+      }
+    }
+
+    async function triggerSyncNow() {
+      if (syncDebounceTimeout) {
+        clearTimeout(syncDebounceTimeout);
+        syncDebounceTimeout = null;
+      }
+
+      if (isSyncingInProgress) {
+        hasPendingSyncRequest = true;
+        return;
+      }
+
+      isSyncingInProgress = true;
+      hasPendingSyncRequest = false;
+
+      try {
+        const success = await pullAndMergeCloudData();
+        if (success) {
+          hasUnsavedChanges = false;
+        }
+      } catch (err) {
+        console.error("Sync execution error during triggerSyncNow:", err);
+      } finally {
+        isSyncingInProgress = false;
+        if (hasPendingSyncRequest) {
+          triggerSyncNow();
         }
       }
     }
@@ -2418,8 +2480,10 @@
       const now = Date.now();
       if (now - lastInteractionSyncTime > SYNC_COOLDOWN_MS) {
         lastInteractionSyncTime = now;
-        setSyncStatus("Checking...", "active");
-        pullAndMergeCloudData();
+        if (!isSyncingInProgress && !syncDebounceTimeout) {
+          setSyncStatus("Checking...", "active");
+          triggerSyncNow();
+        }
       }
     }
 
@@ -2427,6 +2491,13 @@
     window.addEventListener('keydown', handleMicroInteraction);
     window.addEventListener('touchstart', handleMicroInteraction, { passive: true });
     window.addEventListener('focus', handleMicroInteraction);
+
+    window.addEventListener('beforeunload', (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes syncing to the cloud. Are you sure you want to leave?';
+      }
+    });
 
     // =========================================================================
     // SECTION 4: DATA MUTATION & SETUP FUNCTIONS
@@ -2478,7 +2549,7 @@
       localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
       state = load();
       render();
-      pullAndMergeCloudData();
+      scheduleCloudSync();
     }
 
     function deleteAssignment(id) {
@@ -2490,7 +2561,7 @@
       localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
       state = load();
       render();
-      pullAndMergeCloudData();
+      scheduleCloudSync();
     }
 
     function configTable(key) {
@@ -2523,7 +2594,7 @@
       });
 
       updateDataState(databaseArray, true);
-      pullAndMergeCloudData();
+      scheduleCloudSync();
     }
 
     function updateConfig(key, idx, val) {
@@ -2540,7 +2611,7 @@
       );
 
       updateDataState(databaseArray, true);
-      pullAndMergeCloudData();
+      scheduleCloudSync();
     }
 
     function deleteConfig(key, idx) {
@@ -2555,7 +2626,7 @@
       );
 
       updateDataState(databaseArray, true);
-      pullAndMergeCloudData();
+      scheduleCloudSync();
     }
 
     function clearAllData() {
@@ -2566,7 +2637,7 @@
         localStorage.removeItem('edutracker.ui');
         state = load();
         render();
-        pullAndMergeCloudData();
+        scheduleCloudSync(true);
         alert("All data cleared successfully.");
       }
     }
@@ -2578,7 +2649,7 @@
 
     function render() {
       const root = document.getElementById('app');
-      
+
       // Capture scroll positions of any scrollable container before render
       const scrollPositions = [];
       const tabChanged = lastRenderedTab !== state.ui.activeTab;
@@ -2604,9 +2675,9 @@
       else body = renderDashboard();
       const modal = (ui.isAdding || ui.editingId) ? renderModal() : '';
       const moreModal = ui.activeMoreDate ? renderMoreModal() : '';
-      
+
       root.innerHTML = renderSidebar() + '<main class="main-area">' + body + modal + moreModal + '</main>';
-      
+
       bindEvents();
 
       if (!tabChanged) {
