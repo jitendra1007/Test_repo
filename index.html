@@ -77,24 +77,40 @@
       width: 256px;
     }
 
-    .sidebar-toggle {
-      position: absolute;
-      right: -12px;
-      top: 112px;
-      width: 24px;
-      height: 24px;
-      background: #4f46e5;
-      color: #fff;
-      border-radius: 50%;
+    button.brand-icon {
+      cursor: pointer;
+      border: none;
+      padding: 0;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    button.brand-icon:hover {
+      background: #4338ca;
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px rgba(67, 56, 202, 0.3);
+    }
+
+    button.brand-icon:active {
+      transform: translateY(0);
+    }
+
+    .menu-toggle-btn {
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: #64748b;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, .2);
-      z-index: 110;
+      margin-left: auto;
+      outline: none;
+      transition: color 0.2s ease;
     }
 
-    .sidebar-toggle:hover {
-      background: #4338ca;
+    .menu-toggle-btn:hover {
+      color: #cbd5e1;
     }
 
     .sidebar-brand {
@@ -102,6 +118,7 @@
       align-items: center;
       gap: 16px;
       padding: 0 24px;
+      width: 100%;
     }
 
     .sidebar:not(.expanded) .sidebar-brand {
@@ -1810,6 +1827,12 @@
         <path
           d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
       </symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="18" x2="21" y2="18" />
+      </symbol>
       <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -2524,6 +2547,7 @@
         date: data.date || '',
         priority: data.priority || 'Medium',
         status: data.status || 'Not Started',
+        grade: data.grade || '',
         notes: data.notes || ''
       };
 
@@ -2704,12 +2728,18 @@
         { id: 'dashboard', iconId: 'dashboard', label: 'Dashboard' },
         { id: 'calendar', iconId: 'calendar', label: 'Calendar' }
       ];
+
+      const brandCap = '<div class="brand-icon">' + icon('grad', 'width="28" height="28"') + '</div>';
+      const brandName = '<span class="brand-text">EduTracker</span>';
+      const menuBtn = '<button class="menu-toggle-btn" data-act="toggle-nav" aria-label="Toggle nav">' +
+        icon('menu', 'width="20" height="20"') + '</button>';
+
       return '<nav class="sidebar ' + (exp ? 'expanded' : '') + '">' +
-        '<button class="sidebar-toggle" data-act="toggle-nav" aria-label="Toggle nav">' +
-        icon(exp ? 'chev-l' : 'chev-r', 'width="16" height="16"') + '</button>' +
         '<div class="sidebar-brand">' +
-        '<div class="brand-icon">' + icon('grad', 'width="28" height="28"') + '</div>' +
-        '<span class="brand-text">EduTracker</span>' +
+        (exp 
+          ? brandCap + brandName + menuBtn
+          : '<button class="brand-icon" data-act="toggle-nav" aria-label="Toggle nav">' + icon('menu', 'width="24" height="24"') + '</button>'
+        ) +
         '</div>' +
         '<div class="nav-list">' +
         tabs.map(t => '<button class="nav-btn ' + (state.ui.activeTab === t.id ? 'active' : '') +
@@ -3035,20 +3065,23 @@
 
     function renderModal() {
       const editing = ui.editingId ? state.assignments.find(a => a.id === ui.editingId) : null;
-      const data = editing || {
+      const data = Object.assign({
         course: '',
         task: '',
         priority: state.config.priority[0] || 'Medium',
         date: new Date().toISOString().slice(0, 10),
         status: state.config.status[0] || 'Not Started',
+        grade: '',
         notes: ''
-      };
+      }, editing);
       const courseOpts = state.config.courses.map(c =>
         '<option value="' + escapeHtml(c) + '"' + (data.course === c ? ' selected' : '') + '>' + escapeHtml(c) + '</option>').join('');
       const prioOpts = state.config.priority.map(p =>
         '<option value="' + escapeHtml(p) + '"' + (data.priority === p ? ' selected' : '') + '>' + escapeHtml(p) + '</option>').join('');
       const statusOpts = state.config.status.map(s =>
         '<option value="' + escapeHtml(s) + '"' + (data.status === s ? ' selected' : '') + '>' + escapeHtml(s) + '</option>').join('');
+      const gradeOpts = state.config.grades.map(g =>
+        '<option value="' + escapeHtml(g) + '"' + (data.grade === g ? ' selected' : '') + '>' + escapeHtml(g) + '</option>').join('');
       return '<div class="modal-overlay" data-act="modal-bg">' +
         '<div class="modal">' +
         '<div class="modal-header">' +
@@ -3069,6 +3102,11 @@
         '<select class="form-input" name="priority">' + prioOpts + '</select></div>' +
         '<div><label class="form-label">Status</label>' +
         '<select class="form-input" name="status">' + statusOpts + '</select></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+        '<div><label class="form-label">Grade</label>' +
+        '<select class="form-input" name="grade"><option value="">Select Grade (N/A)</option>' + gradeOpts + '</select></div>' +
+        '<div></div>' +
         '</div>' +
         '<div><label class="form-label">Notes</label>' +
         '<textarea class="form-input" name="notes" placeholder="Links or details...">' + escapeHtml(data.notes) + '</textarea></div>' +
