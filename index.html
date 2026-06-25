@@ -1161,7 +1161,7 @@
 
     .cal-event {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 6px;
       padding: 4px 8px;
       border-radius: 4px;
@@ -1169,13 +1169,13 @@
       font-weight: 700;
       border: 1px solid;
       text-align: left;
-      white-space: normal;
-      word-break: break-word;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
 
     .cal-event svg {
       flex-shrink: 0;
-      margin-top: 1px;
     }
 
     .cal-event:active {
@@ -1183,6 +1183,8 @@
     }
 
     .cal-event .ev-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
       flex: 1;
     }
 
@@ -1796,7 +1798,7 @@
 
       .cal-scroll-container {
         display: grid;
-        grid-template-columns: repeat(7, minmax(90px, max-content));
+        grid-template-columns: repeat(7, minmax(140px, 1fr));
         overflow-x: auto;
         overflow-y: hidden;
         background: #fff;
