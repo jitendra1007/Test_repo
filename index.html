@@ -1641,13 +1641,65 @@
       pointer-events: none;
     }
 
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(4px);
+      z-index: 999;
+      transition: opacity 0.3s ease;
+    }
+
     @media (max-width: 768px) {
+      .sidebar-backdrop {
+        display: block;
+      }
+
       .sidebar {
-        width: 64px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 0;
+        padding: 0;
+        overflow: hidden;
+        z-index: 1000;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-right: none;
       }
 
       .sidebar.expanded {
-        width: 200px;
+        width: 256px;
+        padding: 32px 0;
+        box-shadow: 4px 0 25px rgba(0, 0, 0, 0.2);
+      }
+
+      /* When collapsed on mobile, the brand button becomes the floating toggle button */
+      .sidebar:not(.expanded) button.brand-icon {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        z-index: 1001;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: #4f46e5;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+      }
+
+      /* Add space in page headers for the floating toggle button when sidebar is collapsed */
+      .sidebar:not(.expanded) + .main-area .page-header,
+      .sidebar:not(.expanded) + .main-area .setup-header,
+      .sidebar:not(.expanded) + .main-area .cal-header {
+        padding-left: 72px !important;
       }
 
       body,
@@ -2702,7 +2754,7 @@
       const modal = (ui.isAdding || ui.editingId) ? renderModal() : '';
       const moreModal = ui.activeMoreDate ? renderMoreModal() : '';
 
-      root.innerHTML = renderSidebar() + '<main class="main-area">' + body + modal + moreModal + '</main>';
+      root.innerHTML = renderSidebar() + (state.ui.navExpanded ? '<div class="sidebar-backdrop" data-act="toggle-nav"></div>' : '') + '<main class="main-area">' + body + modal + moreModal + '</main>';
 
       bindEvents();
 
