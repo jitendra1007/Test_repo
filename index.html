@@ -1161,7 +1161,7 @@
 
     .cal-event {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 6px;
       padding: 4px 8px;
       border-radius: 4px;
@@ -1169,9 +1169,13 @@
       font-weight: 700;
       border: 1px solid;
       text-align: left;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    .cal-event svg {
+      flex-shrink: 0;
+      margin-top: 1px;
     }
 
     .cal-event:active {
@@ -1179,8 +1183,6 @@
     }
 
     .cal-event .ev-text {
-      overflow: hidden;
-      text-overflow: ellipsis;
       flex: 1;
     }
 
