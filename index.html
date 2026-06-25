@@ -1726,6 +1726,22 @@
         flex-direction: column;
         height: auto;
         overflow: visible;
+        position: relative;
+      }
+
+      /* Shift month change arrows next to the title on mobile */
+      .mini-cal-header {
+        justify-content: flex-start !important;
+        gap: 16px;
+      }
+
+      /* Position the sync badge at the top-right of the dashboard */
+      .dashboard #syncStatusIndicator {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        margin: 0 !important;
+        z-index: 10;
       }
 
       .aside {
@@ -2873,7 +2889,7 @@
       }
       return '<div class="mini-cal-header">' +
         '<h2 class="mini-cal-title">' + fmtDate(sd, { month: 'long', year: 'numeric' }) + '</h2>' +
-        '<div style="display:flex;gap:4px">' +
+        '<div class="mini-cal-nav" style="display:flex;gap:4px">' +
         '<button class="icon-btn" data-act="mini-prev">' + icon('chev-l', 'width="16" height="16"') + '</button>' +
         '<button class="icon-btn" data-act="mini-next">' + icon('chev-r', 'width="16" height="16"') + '</button>' +
         '</div></div>' +
