@@ -1808,6 +1808,14 @@
       .backup-grid {
         grid-template-columns: 1fr;
       }
+
+      /* Disable sticky stacking context on mobile to allow fixed badge to overlay top bar */
+      .page-header,
+      .cal-header,
+      .setup-header {
+        position: relative !important;
+        z-index: auto !important;
+      }
     }
 
     @media print {
