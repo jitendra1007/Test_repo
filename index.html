@@ -1792,13 +1792,25 @@
         padding: 4px;
       }
 
-      .cal-event .ev-text {
-        display: none;
+      .cal-scroll-container {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(90px, max-content));
+        overflow-x: auto;
+        overflow-y: hidden;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
       }
 
-      .cal-event {
-        padding: 4px;
-        justify-content: center;
+      .cal-dow,
+      .cal-grid {
+        display: contents;
+      }
+
+      .cal-dow div {
+        border-bottom: 1px solid #f1f5f9;
+        background: #f8fafc;
       }
 
       .cards-grid {
@@ -3145,8 +3157,10 @@
         '</div>' +
         '</header>' +
         '<main class="cal-body">' +
+        '<div class="cal-scroll-container">' +
         '<div class="cal-dow">' + dows.map((d, i) => '<div class="' + (i === 0 || i === 6 ? 'weekend' : '') + '">' + d + '</div>').join('') + '</div>' +
         '<div class="cal-grid">' + gridHtml + '</div>' +
+        '</div>' +
         '</main>' +
         '</div></div>';
     }
