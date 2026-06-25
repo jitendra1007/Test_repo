@@ -1654,9 +1654,34 @@
       transition: opacity 0.3s ease;
     }
 
+    .mobile-top-bar-bg {
+      display: none;
+    }
+
     @media (max-width: 768px) {
       .sidebar-backdrop {
         display: block;
+      }
+
+      .mobile-top-bar-bg {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 72px;
+        background: rgba(248, 250, 252, 0.85);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+        z-index: 998;
+      }
+
+      .sync-status-badge {
+        position: fixed !important;
+        top: 16px !important;
+        right: 16px !important;
+        margin: 0 !important;
+        z-index: 1001 !important;
       }
 
       .sidebar {
@@ -1695,13 +1720,6 @@
         box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
       }
 
-      /* Add space in page headers for the floating toggle button when sidebar is collapsed */
-      .sidebar:not(.expanded) + .main-area .mini-cal-header,
-      .sidebar:not(.expanded) + .main-area .setup-header,
-      .sidebar:not(.expanded) + .main-area .cal-header {
-        padding-left: 72px !important;
-      }
-
       body,
       html {
         overflow: auto;
@@ -1726,22 +1744,13 @@
         flex-direction: column;
         height: auto;
         overflow: visible;
-        position: relative;
       }
 
-      /* Shift month change arrows next to the title on mobile */
-      .mini-cal-header {
-        justify-content: flex-start !important;
-        gap: 16px;
-      }
-
-      /* Position the sync badge at the top-right of the dashboard */
-      .dashboard #syncStatusIndicator {
-        position: absolute;
-        top: 16px;
-        right: 16px;
-        margin: 0 !important;
-        z-index: 10;
+      /* Shift page contents down to prevent overlapping the frozen top bar */
+      .aside,
+      .setup,
+      .cal-view {
+        margin-top: 72px !important;
       }
 
       .aside {
@@ -2770,7 +2779,7 @@
       const modal = (ui.isAdding || ui.editingId) ? renderModal() : '';
       const moreModal = ui.activeMoreDate ? renderMoreModal() : '';
 
-      root.innerHTML = renderSidebar() + (state.ui.navExpanded ? '<div class="sidebar-backdrop" data-act="toggle-nav"></div>' : '') + '<main class="main-area">' + body + modal + moreModal + '</main>';
+      root.innerHTML = renderSidebar() + (state.ui.navExpanded ? '<div class="sidebar-backdrop" data-act="toggle-nav"></div>' : '') + '<div class="mobile-top-bar-bg"></div>' + '<main class="main-area">' + body + modal + moreModal + '</main>';
 
       bindEvents();
 
