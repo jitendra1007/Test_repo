@@ -2165,8 +2165,8 @@
       config: {
         status: ['Not Started', 'In Progress', 'Complete'],
         priority: ['Urgent', 'High', 'Medium', 'Low', 'Very Low'],
-        courses: ['Maths', 'Biology', 'Physics', 'Geography', 'History'],
-        grades: ['A', 'B', 'C', 'D', 'F']
+        courses: [],
+        grades: []
       },
       ui: { activeTab: 'dashboard', mondayStart: false, navExpanded: false, hideCompleted: false }
     };
@@ -2194,6 +2194,20 @@
         try { databaseArray = JSON.parse(storedData); } catch (e) { databaseArray = []; }
       } else {
         databaseArray = [];
+      }
+
+      // Migrate legacy default course and grade records (soft-delete defaults with updatedAt === 0)
+      let migrated = false;
+      databaseArray = databaseArray.map(r => {
+        if (!r.deleted && r.updatedAt === 0 && (r.table === 'config_course' || r.table === 'config_grade')) {
+          migrated = true;
+          return Object.assign({}, r, { deleted: true, updatedAt: Date.now() });
+        }
+        return r;
+      });
+      if (migrated) {
+        localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
+        scheduleCloudSync();
       }
 
       // 2. Extract assignments (filter by table name and ensure deleted is false)
@@ -2329,9 +2343,14 @@
       return cls[p] || 'prio-default';
     }
 
+    function getCompleteStatusValue() {
+      const rec = databaseArray.find(r => r.id === 'config_status_2' && r.table === 'config_status');
+      return rec ? rec.data.value : 'Complete';
+    }
+
     function statusIcon(status) {
       const s = (status || '').toLowerCase();
-      if (s === 'complete') return icon('check-circle', 'width="16" height="16" class="status-complete"');
+      if (s === getCompleteStatusValue().toLowerCase()) return icon('check-circle', 'width="16" height="16" class="status-complete"');
       if (s === 'in progress') return icon('clock', 'width="16" height="16" class="status-progress"');
       return icon('circle', 'width="16" height="16" class="status-default"');
     }
@@ -2820,10 +2839,31 @@
       const targetRecord = activeRecords[idx];
       if (!targetRecord) return;
 
+      const oldVal = targetRecord.data.value;
       const now = Date.now();
       databaseArray = databaseArray.map(r =>
         r.id === targetRecord.id ? { ...r, updatedAt: now, data: { value: val } } : r
       );
+
+      const fieldMap = {
+        'status': 'status',
+        'priority': 'priority',
+        'courses': 'course',
+        'grades': 'grade'
+      };
+      const field = fieldMap[key];
+      if (field && oldVal !== val) {
+        databaseArray = databaseArray.map(r => {
+          if (r.table === 'assignments' && !r.deleted && r.data[field] === oldVal) {
+            return {
+              ...r,
+              updatedAt: now,
+              data: { ...r.data, [field]: val }
+            };
+          }
+          return r;
+        });
+      }
 
       updateDataState(databaseArray, true);
       scheduleCloudSync();
@@ -2834,6 +2874,11 @@
       const activeRecords = databaseArray.filter(r => r.table === tableName && !r.deleted);
       const targetRecord = activeRecords[idx];
       if (!targetRecord) return;
+
+      if (targetRecord.id === 'config_status_2') {
+        alert('The "Complete" status cannot be deleted.');
+        return;
+      }
 
       const now = Date.now();
       databaseArray = databaseArray.map(r =>
@@ -2944,9 +2989,10 @@
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const total = state.assignments.length;
       let completed = 0, dueToday = 0, overdue = 0;
+      const completeVal = getCompleteStatusValue().toLowerCase();
       state.assignments.forEach(a => {
         const d = parseDate(a.date);
-        const done = (a.status || '').toLowerCase() === 'complete';
+        const done = (a.status || '').toLowerCase() === completeVal;
         if (done) completed++;
         if (d && isSameDay(d, today)) dueToday++;
         if (d && d < today && !done) overdue++;
@@ -3020,12 +3066,13 @@
 
     function renderDashboard() {
       const stats = computeStats();
+      const completeVal = getCompleteStatusValue().toLowerCase();
       const filtered = state.assignments
         .filter(a => {
           const matchesSearch = (a.task || '').toLowerCase().includes(ui.search.toLowerCase());
           const matchesCourse = ui.filterCourse === 'All' || a.course === ui.filterCourse;
           const matchesStatus = ui.filterStatus === 'All' || a.status === ui.filterStatus;
-          const done = (a.status || '').toLowerCase() === 'complete';
+          const done = (a.status || '').toLowerCase() === completeVal;
           return matchesSearch && matchesCourse && matchesStatus && (!state.ui.hideCompleted || !done);
         })
         .sort((a, b) => ((parseDate(a.date) && parseDate(a.date).getTime()) || Infinity) -
@@ -3035,6 +3082,8 @@
         const d = parseDate(a.date);
         return d && isSameDay(d, ui.selectedDate);
       });
+
+      const dailyActiveCount = daily.filter(a => (a.status || '').toLowerCase() !== completeVal).length;
 
       const dailyHtml = daily.length ? daily.map(a =>
         '<div class="due-item" data-act="edit" data-id="' + a.id + '">' +
@@ -3058,7 +3107,7 @@
         '<div class="due-section">' +
         '<div class="due-header">' +
         '<h3>Due: ' + fmtDate(ui.selectedDate, { day: 'numeric', month: 'short' }) + '</h3>' +
-        '<span class="pill">' + daily.length + '</span>' +
+        '<span class="pill">' + dailyActiveCount + '</span>' +
         '</div>' +
         '<div class="due-list">' + dailyHtml + '</div>' +
         '</div>' +
@@ -3103,6 +3152,8 @@
         { key: 'grades', name: 'Grades', iconId: 'grad', color: 'col-purple' }
       ];
       const colsHtml = cols.map(col => {
+        const tableName = configTable(col.key);
+        const activeRecords = databaseArray.filter(r => r.table === tableName && !r.deleted);
         const items = state.config[col.key] || [];
         const newVal = ui.newConfigValues[col.key] || '';
         const itemsHtml = items.length === 0
@@ -3116,11 +3167,15 @@
                 '<button class="icon-action" data-act="config-cancel">' + icon('x', 'width="16" height="16"') + '</button>' +
                 '</div>';
             }
+            const isCompleteStatus = col.key === 'status' && activeRecords[idx] && activeRecords[idx].id === 'config_status_2';
+            const deleteBtn = isCompleteStatus
+              ? ''
+              : '<button class="icon-action danger" data-act="config-delete" data-key="' + col.key + '" data-idx="' + idx + '">' + icon('trash', 'width="14" height="14"') + '</button>';
             return '<div class="setup-item">' +
               '<span class="val">' + escapeHtml(val) + '</span>' +
               '<div class="actions">' +
               '<button class="icon-action" data-act="config-start-edit" data-key="' + col.key + '" data-idx="' + idx + '">' + icon('edit', 'width="14" height="14"') + '</button>' +
-              '<button class="icon-action danger" data-act="config-delete" data-key="' + col.key + '" data-idx="' + idx + '">' + icon('trash', 'width="14" height="14"') + '</button>' +
+              deleteBtn +
               '</div></div>';
           }).join('');
         return '<div class="setup-col">' +
@@ -3207,8 +3262,9 @@
       while (grid.length < 42) { grid.push({ date: new Date(year, month + 1, nextDay++), current: false }); }
 
       const byDate = {};
+      const completeVal = getCompleteStatusValue().toLowerCase();
       state.assignments.forEach(a => {
-        const done = (a.status || '').toLowerCase() === 'complete';
+        const done = (a.status || '').toLowerCase() === completeVal;
         if (state.ui.hideCompleted && done) return;
         const d = parseDate(a.date); if (!d) return;
         const k = d.toDateString();
@@ -3593,12 +3649,13 @@
       if (state.ui.activeTab !== 'dashboard') return;
       const container = document.querySelector('.scroll-area');
       if (!container) return;
+      const completeVal = getCompleteStatusValue().toLowerCase();
       const filtered = state.assignments
         .filter(a => {
           const matchesSearch = (a.task || '').toLowerCase().includes(ui.search.toLowerCase());
           const matchesCourse = ui.filterCourse === 'All' || a.course === ui.filterCourse;
           const matchesStatus = ui.filterStatus === 'All' || a.status === ui.filterStatus;
-          const done = (a.status || '').toLowerCase() === 'complete';
+          const done = (a.status || '').toLowerCase() === completeVal;
           return matchesSearch && matchesCourse && matchesStatus && (!state.ui.hideCompleted || !done);
         })
         .sort((a, b) => ((parseDate(a.date) && parseDate(a.date).getTime()) || Infinity) -
