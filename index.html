@@ -1074,17 +1074,21 @@
       padding: 32px;
     }
 
-    .cal-dow {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
+    .cal-scroll-container {
       background: #fff;
       border: 1px solid #e2e8f0;
-      border-bottom: none;
-      border-radius: 16px 16px 0 0;
+      border-radius: 16px;
       overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
     }
 
-    .cal-dow div {
+    .cal-grid-wrapper {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      width: 100%;
+    }
+
+    .cal-dow-cell {
       padding: 16px;
       text-align: center;
       font-size: 10px;
@@ -1093,24 +1097,15 @@
       letter-spacing: .15em;
       color: #94a3b8;
       border-right: 1px solid #f1f5f9;
+      border-bottom: 1px solid #e2e8f0;
     }
 
-    .cal-dow div:last-child {
+    .cal-dow-cell:nth-child(7n) {
       border-right: none;
     }
 
-    .cal-dow .weekend {
+    .cal-dow-cell.weekend {
       background: rgba(248, 250, 252, .5);
-    }
-
-    .cal-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      background: #fff;
-      border: 1px solid #e2e8f0;
-      border-radius: 0 0 16px 16px;
-      overflow: hidden;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
     }
 
     .cal-cell {
@@ -1120,6 +1115,14 @@
       min-height: 140px;
       border-right: 1px solid #f1f5f9;
       border-bottom: 1px solid #f1f5f9;
+    }
+
+    .cal-cell:nth-child(7n) {
+      border-right: none;
+    }
+
+    .cal-cell:nth-child(n+43) {
+      border-bottom: none;
     }
 
     .cal-cell.weekend.current {
@@ -1207,7 +1210,7 @@
       inset: 0;
       background: rgba(15, 23, 42, .6);
       backdrop-filter: blur(4px);
-      z-index: 120;
+      z-index: 2000;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1222,6 +1225,9 @@
       max-width: 512px;
       overflow: hidden;
       animation: zoomIn .2s ease;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
     }
 
     @keyframes zoomIn {
@@ -1269,6 +1275,8 @@
       display: flex;
       flex-direction: column;
       gap: 24px;
+      overflow-y: auto;
+      flex: 1;
     }
 
     .form-row {
@@ -1794,22 +1802,30 @@
       .cal-cell {
         min-height: 80px;
         padding: 4px;
+        min-width: max-content;
+      }
+
+      .cal-events {
+        min-width: max-content;
       }
 
       .cal-scroll-container {
-        display: grid;
-        grid-template-columns: repeat(7, minmax(90px, max-content));
+        display: block;
         overflow-x: auto;
         overflow-y: hidden;
         background: #fff;
         border: 1px solid #e2e8f0;
         border-radius: 16px;
         box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+        width: 100%;
+        -webkit-overflow-scrolling: touch;
       }
 
-      .cal-dow,
-      .cal-grid {
-        display: contents;
+      .cal-grid-wrapper {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(120px, max-content));
+        width: max-content;
+        min-width: 100%;
       }
 
       .cal-event {
@@ -1826,7 +1842,7 @@
         white-space: nowrap;
       }
 
-      .cal-dow div {
+      .cal-dow-cell {
         border-bottom: 1px solid #f1f5f9;
         background: #f8fafc;
       }
@@ -1916,8 +1932,12 @@
         min-height: 100px;
       }
 
-      .cal-grid,
-      .cal-dow {
+      .cal-scroll-container {
+        border-color: #94a3b8 !important;
+      }
+
+      .cal-dow-cell,
+      .cal-cell {
         border-color: #94a3b8 !important;
       }
     }
@@ -1966,6 +1986,7 @@
       .desktop-tutorial {
         display: none !important;
       }
+
       .mobile-tutorial {
         display: inline-flex !important;
       }
@@ -1991,8 +2012,8 @@
         <path
           d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
       </symbol>
-      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round">
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round">
         <line x1="3" y1="12" x2="21" y2="12" />
         <line x1="3" y1="6" x2="21" y2="6" />
         <line x1="3" y1="18" x2="21" y2="18" />
@@ -2127,7 +2148,8 @@
         <rect x="6" y="14" width="12" height="8" />
       </symbol>
       <symbol id="i-youtube" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.518 3.545 12 3.545 12 3.545s-7.517 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.508 9.388.508 9.388.508s7.518 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+        <path
+          d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.518 3.545 12 3.545 12 3.545s-7.517 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.508 9.388.508 9.388.508s7.518 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
       </symbol>
     </defs>
   </svg>
@@ -2905,7 +2927,7 @@
 
       return '<nav class="sidebar ' + (exp ? 'expanded' : '') + '">' +
         '<div class="sidebar-brand">' +
-        (exp 
+        (exp
           ? brandCap + brandName + menuBtn
           : '<button class="brand-icon" data-act="toggle-nav" aria-label="Toggle nav">' + icon('menu', 'width="24" height="24"') + '</button>'
         ) +
@@ -3239,8 +3261,10 @@
         '</header>' +
         '<main class="cal-body">' +
         '<div class="cal-scroll-container">' +
-        '<div class="cal-dow">' + dows.map((d, i) => '<div class="' + (i === 0 || i === 6 ? 'weekend' : '') + '">' + d + '</div>').join('') + '</div>' +
-        '<div class="cal-grid">' + gridHtml + '</div>' +
+        '<div class="cal-grid-wrapper">' +
+        dows.map((d, i) => '<div class="cal-dow-cell ' + (i === 0 || i === 6 ? 'weekend' : '') + '">' + d + '</div>').join('') +
+        gridHtml +
+        '</div>' +
         '</div>' +
         '</main>' +
         '</div></div>';
@@ -3313,7 +3337,7 @@
         '</div>' +
         icon('arrow-r', 'width="16" height="16" style="opacity:.5"') +
         '</button>').join('');
-      return '<div class="modal-overlay" data-act="more-bg" style="z-index:110">' +
+      return '<div class="modal-overlay" data-act="more-bg" style="z-index:2000">' +
         '<div class="modal more-modal">' +
         '<div class="modal-header">' +
         '<div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.15em">Assignments Due</div>' +
