@@ -2568,9 +2568,6 @@
 
         updateAuthUI(false);
 
-        // Reset state & databaseArray locally
-        databaseArray = [];
-        localStorage.setItem('edutracker_local_data', JSON.stringify([]));
         state = load();
         render();
       } else {
