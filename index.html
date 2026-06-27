@@ -2168,7 +2168,7 @@
         courses: [],
         grades: []
       },
-      ui: { activeTab: 'dashboard', mondayStart: false, navExpanded: false, hideCompleted: false }
+      ui: { activeTab: 'dashboard', mondayStart: true, navExpanded: false, hideCompleted: false }
     };
 
     let state = {
@@ -2250,10 +2250,47 @@
         console.error('Failed to load UI state', e);
       }
 
+      // 5. Load and sync mondayStart setting from databaseArray
+      const mondayStartRecord = databaseArray.find(r => r.id === 'ui_monday_start' && !r.deleted);
+      let mondayStartVal = DEFAULT_STATE.ui.mondayStart; // true by default
+      let shouldSync = false;
+
+      if (mondayStartRecord) {
+        mondayStartVal = mondayStartRecord.data.value;
+      } else {
+        // If not in databaseArray, check if it exists in localUi (migration case)
+        if (localUi && localUi.mondayStart !== undefined) {
+          mondayStartVal = localUi.mondayStart;
+          databaseArray.push({
+            id: 'ui_monday_start',
+            table: 'settings',
+            updatedAt: Date.now(), // set to now to trigger sync
+            deleted: false,
+            data: { value: mondayStartVal }
+          });
+          shouldSync = true;
+        } else {
+          // First-time load: initialize in databaseArray with default (true)
+          databaseArray.push({
+            id: 'ui_monday_start',
+            table: 'settings',
+            updatedAt: 0, // Set to 0 so cloud modifications override it
+            deleted: false,
+            data: { value: true }
+          });
+          shouldSync = true;
+        }
+        localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
+      }
+
+      if (shouldSync) {
+        scheduleCloudSync();
+      }
+
       return {
         assignments: assignments,
         config: config,
-        ui: Object.assign({}, DEFAULT_STATE.ui, localUi)
+        ui: Object.assign({}, DEFAULT_STATE.ui, localUi, { mondayStart: mondayStartVal })
       };
     }
 
@@ -3503,9 +3540,8 @@
             break;
           case 'toggle-monday':
             el.onclick = () => {
-              state.ui.mondayStart = !state.ui.mondayStart;
-              saveUi();
-              render();
+              const newVal = !state.ui.mondayStart;
+              setMondayStartSetting(newVal);
             };
             break;
           case 'select-day':
@@ -3643,6 +3679,34 @@
       updateConfig(ui.editingConfig.key, ui.editingConfig.idx, ui.editingConfig.value);
       ui.editingConfig = null;
       render();
+    }
+
+    function setMondayStartSetting(val) {
+      const now = Date.now();
+      const recordId = 'ui_monday_start';
+      const existingIdx = databaseArray.findIndex(r => r.id === recordId);
+      if (existingIdx >= 0) {
+        databaseArray[existingIdx] = {
+          id: recordId,
+          table: 'settings',
+          updatedAt: now,
+          deleted: false,
+          data: { value: val }
+        };
+      } else {
+        databaseArray.push({
+          id: recordId,
+          table: 'settings',
+          updatedAt: now,
+          deleted: false,
+          data: { value: val }
+        });
+      }
+      localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
+      state = load();
+      saveUi();
+      render();
+      scheduleCloudSync();
     }
 
     function updateDashCards() {
