@@ -823,6 +823,12 @@
       margin-bottom: 32px;
     }
 
+    .setup-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
     .setup-header-icon {
       background: #4f46e5;
       padding: 8px;
@@ -1696,6 +1702,18 @@
         z-index: 1001 !important;
       }
 
+      .sidebar.expanded ~ .main-area .sync-status-badge {
+        display: none !important;
+      }
+
+      .setup-header-left {
+        align-items: flex-start !important;
+      }
+
+      .setup-header-left .setup-header-icon {
+        margin-top: 2px;
+      }
+
       .sidebar {
         position: fixed;
         top: 0;
@@ -1988,7 +2006,9 @@
       }
 
       .mobile-tutorial {
-        display: inline-flex !important;
+        display: flex !important;
+        width: 100%;
+        justify-content: center;
       }
     }
   </style>
@@ -2414,8 +2434,34 @@
 
     let currentSyncStatusText = "";
     let currentSyncStatusType = "";
+    let syncTimerId = null;
+    let lastSyncTime = null;
 
-    function setSyncStatus(text, type = '') {
+    function updateRelativeSyncStatus() {
+      if (!lastSyncTime) return;
+      const el = document.getElementById('syncStatusIndicator');
+      if (!el) return;
+
+      const diff = Date.now() - lastSyncTime;
+      let newText = "";
+      if (diff < 30 * 1000) {
+        newText = "✅ Synced Just Now";
+      } else if (diff < 120 * 1000) {
+        newText = "☁️ Last synced 1 min ago";
+      } else {
+        const mins = Math.floor(diff / 60000);
+        newText = `☁️ Last synced ${mins} min ago`;
+      }
+
+      const currentText = el.innerText;
+      const isShowingSyncedStatus = currentText === "✅ Synced Just Now" || currentText.startsWith("☁️ Last synced");
+      if (isShowingSyncedStatus && currentText !== newText) {
+        el.innerText = newText;
+        currentSyncStatusText = newText;
+      }
+    }
+
+    function setSyncStatus(text, type = '', isNewSync = false) {
       currentSyncStatusText = text;
       currentSyncStatusType = type;
       const el = document.getElementById('syncStatusIndicator');
@@ -2442,6 +2488,20 @@
               }
             };
           }
+        }
+      }
+
+      if (isNewSync) {
+        lastSyncTime = Date.now();
+        if (!syncTimerId) {
+          syncTimerId = setInterval(updateRelativeSyncStatus, 5000);
+        }
+      } else {
+        const isSyncedText = text === "✅ Synced Just Now" || text.startsWith("☁️ Last synced");
+        if (syncTimerId && !isSyncedText) {
+          clearInterval(syncTimerId);
+          syncTimerId = null;
+          lastSyncTime = null;
         }
       }
     }
@@ -2480,7 +2540,7 @@
           localStorage.setItem('edutracker_has_linked_google', 'true');
 
           updateAuthUI(true);
-          setSyncStatus("Cloud Synced ✅", "active");
+          setSyncStatus("✅ Synced Just Now", "active", true);
 
           await pullAndMergeCloudData();
         },
@@ -2501,7 +2561,7 @@
           accessToken = cachedToken;
           gapi.client.setToken({ access_token: accessToken });
           updateAuthUI(true);
-          setSyncStatus("Cloud Synced ✅", "active");
+          setSyncStatus("✅ Synced Just Now", "active", true);
           pullAndMergeCloudData();
         } else {
           if (isRefreshingToken) return;
@@ -2620,7 +2680,7 @@
           success = await autoUploadToCloud();
         }
         if (success) {
-          setSyncStatus("Cloud Synced ✅", "active");
+          setSyncStatus("✅ Synced Just Now", "active", true);
           return true;
         }
         return false;
@@ -2667,7 +2727,7 @@
           body: JSON.stringify(payload)
         });
 
-        setSyncStatus("Cloud Synced ✅", "active");
+        setSyncStatus("✅ Synced Just Now", "active", true);
         return true;
       } catch (err) {
         console.error("Cloud engine commit intercept:", err);
@@ -2926,7 +2986,56 @@
     function clearAllData() {
       if (confirm("Are you sure you want to delete all local and cloud data? This cannot be undone.")) {
         const now = Date.now();
-        databaseArray = databaseArray.map(r => ({ ...r, deleted: true, updatedAt: now }));
+        const defaultStatuses = DEFAULT_STATE.config.status;
+        const defaultPriorities = DEFAULT_STATE.config.priority;
+        const defaultRecords = [];
+
+        defaultStatuses.forEach((val, idx) => {
+          defaultRecords.push({
+            id: 'config_status_' + idx,
+            table: 'config_status',
+            updatedAt: now,
+            deleted: false,
+            data: { value: val }
+          });
+        });
+
+        defaultPriorities.forEach((val, idx) => {
+          defaultRecords.push({
+            id: 'config_priority_' + idx,
+            table: 'config_priority',
+            updatedAt: now,
+            deleted: false,
+            data: { value: val }
+          });
+        });
+
+        defaultRecords.push({
+          id: 'ui_monday_start',
+          table: 'settings',
+          updatedAt: now,
+          deleted: false,
+          data: { value: true }
+        });
+
+        const defaultIds = new Set(defaultRecords.map(r => r.id));
+        const updatedDb = databaseArray.map(r => {
+          if (defaultIds.has(r.id)) {
+            const defRec = defaultRecords.find(dr => dr.id === r.id);
+            return { ...defRec };
+          } else {
+            return { ...r, deleted: true, updatedAt: now };
+          }
+        });
+
+        const existingIds = new Set(databaseArray.map(r => r.id));
+        defaultRecords.forEach(dr => {
+          if (!existingIds.has(dr.id)) {
+            updatedDb.push(dr);
+          }
+        });
+
+        databaseArray = updatedDb;
         localStorage.setItem('edutracker_local_data', JSON.stringify(databaseArray));
         localStorage.removeItem('edutracker.ui');
         state = load();
@@ -3224,7 +3333,7 @@
 
       return '<div class="view"><div class="setup">' +
         '<header class="setup-header" style="display:flex;justify-content:space-between;align-items:center;width:100%">' +
-        '<div style="display:flex;align-items:center;gap:12px">' +
+        '<div class="setup-header-left">' +
         '<div class="setup-header-icon">' + icon('settings', 'width="24" height="24"') + '</div>' +
         '<div>' +
         '<h1>Workspace Setup</h1>' +
@@ -3455,6 +3564,9 @@
           case 'tab':
             el.onclick = () => {
               state.ui.activeTab = el.dataset.tab;
+              if (window.innerWidth <= 768) {
+                state.ui.navExpanded = false;
+              }
               saveUi();
               render();
             };
