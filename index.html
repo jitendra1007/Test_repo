@@ -2445,7 +2445,7 @@
       const diff = Date.now() - lastSyncTime;
       let newText = "";
       if (diff < 30 * 1000) {
-        newText = "Synced Just Now";
+        newText = "✅ Synced Just Now";
       } else if (diff < 120 * 1000) {
         newText = "☁️ Last synced 1 min ago";
       } else {
